@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>EB Order</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Figtree', sans-serif; background: #f5f5f3; color: #1a1a1a; font-size: 16px; -webkit-font-smoothing: antialiased; }
+
+  header { background: #fff; border-bottom: 1px solid #e8e8e5; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .logo { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+  .logo em { color: #22a06b; font-style: normal; }
+  .inv-badge { font-size: 12px; color: #888; background: #f0f0ee; padding: 4px 10px; border-radius: 20px; }
+
+  .form-body { padding: 16px 20px 110px; max-width: 520px; margin: 0 auto; }
+
+  .group { background: #fff; border-radius: 12px; border: 1px solid #e8e8e5; overflow: hidden; margin-bottom: 12px; }
+  .group-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #aaa; padding: 12px 16px 4px; }
+  .field { padding: 10px 16px; border-bottom: 1px solid #f0f0ee; }
+  .field:last-child { border-bottom: none; }
+  label { display: block; font-size: 12px; font-weight: 500; color: #888; margin-bottom: 4px; }
+
+  input, select, textarea {
+    width: 100%; border: none; outline: none;
+    font-family: 'Figtree', sans-serif; font-size: 15px;
+    color: #1a1a1a; background: transparent; padding: 0; -webkit-appearance: none;
+  }
+  input::placeholder, textarea::placeholder { color: #ccc; }
+  textarea { resize: none; min-height: 56px; line-height: 1.5; }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23bbb'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 0 center; padding-right: 16px; cursor: pointer;
+  }
+
+  .product-builder { padding: 12px 16px; border-bottom: 1px solid #f0f0ee; }
+  .builder-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; flex-wrap: wrap; }
+  .builder-row .col { flex: 1; min-width: 0; }
+  .builder-row .col-sm { flex: 0 0 72px; }
+
+  .builder-select {
+    width: 100%; border: 1.5px solid #e8e8e5; border-radius: 8px; outline: none;
+    font-family: 'Figtree', sans-serif; font-size: 14px; color: #1a1a1a;
+    background: #fafafa; padding: 9px 32px 9px 10px; -webkit-appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23bbb'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    transition: border-color 0.15s;
+  }
+  .builder-select:focus { border-color: #22a06b; }
+
+  .builder-input {
+    width: 100%; border: 1.5px solid #e8e8e5; border-radius: 8px; outline: none;
+    font-family: 'Figtree', sans-serif; font-size: 14px; color: #1a1a1a;
+    background: #fafafa; padding: 9px 10px; transition: border-color 0.15s;
+  }
+  .builder-input:focus { border-color: #22a06b; }
+  .builder-input::placeholder { color: #ccc; }
+
+  .variant-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .var-radio { display: none; }
+  .var-pill {
+    padding: 5px 12px; border-radius: 20px; border: 1.5px solid #e0e0dd;
+    font-size: 13px; font-weight: 500; color: #888; cursor: pointer;
+    transition: all 0.12s; user-select: none;
+  }
+  .var-radio:checked + .var-pill { border-color: #22a06b; color: #22a06b; background: #f0faf5; }
+  .variant-label { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 6px; }
+
+  .add-btn {
+    width: 100%; background: #f5f5f3; border: 1.5px dashed #d0d0ce; border-radius: 8px;
+    padding: 10px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 500;
+    color: #22a06b; cursor: pointer; transition: background 0.12s;
+  }
+  .add-btn:active { background: #eaf7f2; }
+
+  .basket { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .basket-item {
+    background: #fff; border: 1px solid #e8e8e5; border-radius: 10px;
+    padding: 12px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  }
+  .basket-item-info { flex: 1; min-width: 0; }
+  .basket-item-name { font-size: 14px; font-weight: 500; color: #1a1a1a; margin-bottom: 2px; line-height: 1.3; }
+  .basket-item-meta { font-size: 12px; color: #888; }
+  .basket-item-right { text-align: right; flex-shrink: 0; }
+  .basket-item-price { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .remove-btn { background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 0; line-height: 1; margin-top: 2px; display: block; }
+  .remove-btn:active { color: #e53e3e; }
+
+  .pay-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pay-radio { display: none; }
+  .pay-pill { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #e0e0dd; font-size: 13px; font-weight: 500; color: #888; cursor: pointer; transition: all 0.12s; user-select: none; }
+  .pay-radio:checked + .pay-pill { border-color: #22a06b; color: #22a06b; background: #f0faf5; }
+
+  .totals { background: #fff; border-radius: 12px; border: 1px solid #e8e8e5; padding: 14px 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .total-label { font-size: 13px; color: #888; }
+  .total-val { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+  .fee-line { font-size: 11px; color: #f59e0b; margin-top: 2px; }
+
+  .submit-wrap { position: fixed; bottom: 0; left: 0; right: 0; padding: 16px 20px; background: #f5f5f3; border-top: 1px solid #e8e8e5; }
+  .submit-wrap-inner { max-width: 520px; margin: 0 auto; }
+  button[type="submit"] { width: 100%; background: #1a1a1a; color: #fff; border: none; border-radius: 10px; padding: 15px; font-family: 'Figtree', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; letter-spacing: -0.01em; }
+  button[type="submit"]:active { opacity: 0.8; }
+  button[type="submit"]:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .success { display: none; position: fixed; inset: 0; background: #fff; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; text-align: center; z-index: 999; }
+  .success.show { display: flex; }
+  .tick { width: 56px; height: 56px; background: #f0faf5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 20px; }
+  .success h2 { font-size: 22px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.02em; }
+  .success p { font-size: 14px; color: #888; line-height: 1.6; }
+  .success .inv { font-size: 13px; font-weight: 600; color: #22a06b; margin: 12px 0 28px; }
+  .new-order-btn { background: #f5f5f3; border: 1.5px solid #e0e0dd; color: #1a1a1a; border-radius: 10px; padding: 13px 32px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .empty-basket { font-size: 13px; color: #bbb; text-align: center; padding: 8px 0 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">Exposure<em>Boost</em></span>
+  <span class="inv-badge">INV-10076</span>
+</header>
+
+<form id="form" onsubmit="handleSubmit(event)">
+<div class="form-body">
+
+  <!-- Customer -->
+  <div class="group">
+    <div class="group-label">Customer</div>
+    <div class="field"><label>Company name</label><input type="text" id="company" placeholder="Ace Jewellers" required autocomplete="off"></div>
+    <div class="field"><label>Contact name</label><input type="text" id="contact" placeholder="Sarah Ahmed" required autocomplete="off"></div>
+    <div class="field"><label>Email</label><input type="email" id="email" placeholder="sarah@acejewellers.co.uk" required inputmode="email"></div>
+    <div class="field"><label>WhatsApp / phone</label><input type="tel" id="phone" placeholder="+44 7700 000000" required inputmode="tel"></div>
+    <div class="field"><label>Delivery address</label><textarea id="address" placeholder="123 High St, London, E1 1AA" required></textarea></div>
+  </div>
+
+  <!-- Basket -->
+  <div class="group-label" style="padding: 0 4px 8px; font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#aaa;">Order items</div>
+  <div class="basket" id="basket">
+    <div class="empty-basket" id="emptyMsg">No items yet — add a product below</div>
+  </div>
+
+  <!-- Product builder -->
+  <div class="group">
+    <div class="group-label">Add product</div>
+    <div class="product-builder">
+
+      <div class="builder-row">
+        <div class="col">
+          <label style="font-size:12px;color:#888;margin-bottom:5px;display:block;">Product</label>
+          <select class="builder-select" id="bProduct" onchange="onProductChange()">
+            <option value="">Select…</option>
+
+            <optgroup label="Brushed Metal Cards — £95">
+              <!-- First 3: single finish (no colour choice needed), just Printed or Engraved -->
+              <option value="Gold Brushed Metal Card"       data-variants="Printed,Engraved"                          data-price="95">Gold Brushed Metal Card</option>
+              <option value="Silver Brushed Metal Card"     data-variants="Printed,Engraved"                          data-price="95">Silver Brushed Metal Card</option>
+              <option value="Rose Gold Brushed Metal Card"  data-variants="Printed,Engraved"                          data-price="95">Rose Gold Brushed Metal Card</option>
+              <!-- White & Black: Printed / Custom Colour only -->
+              <option value="White Brushed Metal Card"      data-variants="Printed,Custom Colour"                     data-price="95">White Brushed Metal Card</option>
+              <option value="Black Brushed Metal Card"      data-variants="Printed,Custom Colour"                     data-price="95">Black Brushed Metal Card</option>
+            </optgroup>
+
+            <optgroup label="Coated Metal Cards — £95">
+              <!-- All coated: Printed, Engraved/Silver, Engraved/Gold -->
+              <!-- Black also gets Engraved/Rose Gold -->
+              <option value="Black Coated Metal Card"   data-variants="Printed,Engraved / Silver,Engraved / Gold,Engraved / Rose Gold"  data-price="95">Black Coated Metal Card</option>
+              <option value="Blue Coated Metal Card"    data-variants="Printed,Engraved / Silver,Engraved / Gold"                       data-price="95">Blue Coated Metal Card</option>
+              <option value="Green Coated Metal Card"   data-variants="Printed,Engraved / Silver,Engraved / Gold"                       data-price="95">Green Coated Metal Card</option>
+              <option value="Purple Coated Metal Card"  data-variants="Printed,Engraved / Silver,Engraved / Gold"                       data-price="95">Purple Coated Metal Card</option>
+              <option value="White Coated Metal Card"   data-variants="Printed,Engraved / Silver,Engraved / Gold"                       data-price="95">White Coated Metal Card</option>
+              <option value="Red Coated Metal Card"     data-variants="Printed"                                                         data-price="95">Red Coated Metal Card</option>
+            </optgroup>
+
+            <optgroup label="Wood Cards — £70">
+              <option value="Bamboo Wood Card"       data-variants="Printed,Engraved" data-price="70">Bamboo</option>
+              <option value="Black Bamboo Wood Card" data-variants="Printed,Engraved" data-price="70">Black Bamboo</option>
+              <option value="Cherry Wood Card"       data-variants="Printed,Engraved" data-price="70">Cherry</option>
+              <option value="Walnut Wood Card"       data-variants="Printed,Engraved" data-price="70">Walnut</option>
+              <option value="Sapele Wood Card"       data-variants="Printed,Engraved" data-price="70">Sapele</option>
+              <option value="Oak Wood Card"          data-variants="Printed,Engraved" data-price="70">Oak</option>
+              <option value="Maple Wood Card"        data-variants="Printed,Engraved" data-price="70">Maple</option>
+            </optgroup>
+
+            <optgroup label="Plastic Cards — £70">
+              <option value="White Plastic Card"   data-variants="Matte,Spot Gloss" data-price="70">White (Custom Colour)</option>
+              <option value="Black Plastic Card"   data-variants="Matte,Spot Gloss" data-price="70">Black</option>
+              <option value="Blue Plastic Card"    data-variants="Matte,Spot Gloss" data-price="70">Blue</option>
+              <option value="Purple Plastic Card"  data-variants="Matte,Spot Gloss" data-price="70">Purple</option>
+              <option value="Red Plastic Card"     data-variants="Matte,Spot Gloss" data-price="70">Red</option>
+              <option value="Green Plastic Card"   data-variants="Matte,Spot Gloss" data-price="70">Green</option>
+              <option value="Pink Plastic Card"    data-variants="Matte,Spot Gloss" data-price="70">Pink</option>
+              <option value="Orange Plastic Card"  data-variants="Matte,Spot Gloss" data-price="70">Orange</option>
+            </optgroup>
+
+            <optgroup label="Table Talker">
+              <option value="Black Table Talker" data-variants="Large — £95,Small — £85" data-price="95">Black Table Talker</option>
+              <option value="White Table Talker" data-variants="Large — £95,Small — £85" data-price="95">White Table Talker</option>
+            </optgroup>
+
+            <optgroup label="Keyrings — £60 for 3">
+              <option value="Keyring" data-variants="Regular,Slanted" data-price="60">Keyring (x3)</option>
+            </optgroup>
+
+          </select>
+        </div>
+      </div>
+
+      <!-- Variants -->
+      <div id="variantSection" style="display:none; margin-bottom:10px;">
+        <div class="variant-label" id="variantLabel">Finish</div>
+        <div class="variant-row" id="variantRow"></div>
+      </div>
+
+      <!-- Qty + price -->
+      <div class="builder-row">
+        <div class="col-sm">
+          <label style="font-size:12px;color:#888;margin-bottom:5px;display:block;">Qty</label>
+          <input class="builder-input" type="number" id="bQty" value="1" min="1" inputmode="numeric">
+        </div>
+        <div class="col">
+          <label style="font-size:12px;color:#888;margin-bottom:5px;display:block;">Your price (£)</label>
+          <input class="builder-input" type="number" id="bPrice" placeholder="95.00" step="0.01" min="0" inputmode="decimal">
+        </div>
+      </div>
+
+      <button type="button" class="add-btn" onclick="addItem()">+ Add to order</button>
+    </div>
+  </div>
+
+  <!-- Payment -->
+  <div class="group">
+    <div class="group-label">Payment</div>
+    <div class="field">
+      <div class="pay-row">
+        <input class="pay-radio" type="radio" name="pay" id="pm1" value="Monzo transfer" required onchange="calcTotal()">
+        <label class="pay-pill" for="pm1">Monzo</label>
+        <input class="pay-radio" type="radio" name="pay" id="pm2" value="Lopay card" onchange="calcTotal()">
+        <label class="pay-pill" for="pm2">Lopay</label>
+        <input class="pay-radio" type="radio" name="pay" id="pm3" value="Cash" onchange="calcTotal()">
+        <label class="pay-pill" for="pm3">Cash</label>
+      </div>
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="paystatus" required>
+        <option value="">Select…</option>
+        <option value="Paid in full">Paid in full</option>
+        <option value="Partial deposit">Partial deposit</option>
+        <option value="Not yet paid">Not yet paid</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="notes" placeholder="e.g. Gold engraving, QR code on back…"></textarea>
+    </div>
+  </div>
+
+  <!-- Totals -->
+  <div class="totals">
+    <div>
+      <div class="total-label">Order total</div>
+      <div class="fee-line" id="feeLine" style="display:none;"></div>
+    </div>
+    <div class="total-val" id="totalVal">£0.00</div>
+  </div>
+
+</div>
+<div class="submit-wrap">
+  <div class="submit-wrap-inner">
+    <button type="submit" id="submitBtn" disabled>Add items to submit</button>
+  </div>
+</div>
+</form>
+
+<!-- Success -->
+<div class="success" id="successScreen">
+  <div class="tick">✓</div>
+  <h2>Order submitted</h2>
+  <p id="successDesc"></p>
+  <div class="inv">INV-10076</div>
+  <button class="new-order-btn" onclick="resetForm()">New order</button>
+</div>
+
+<script>
+  var basket = [];
+
+  // Products whose variants are a size/price combo — auto-update price when selected
+  var SIZE_PRICE_MAP = {
+    'Large — £95': 95,
+    'Small — £85': 85
+  };
+
+  function onProductChange() {
+    var sel = document.getElementById('bProduct');
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt.value) { document.getElementById('variantSection').style.display = 'none'; return; }
+
+    var variants = opt.dataset.variants ? opt.dataset.variants.split(',') : [];
+    var defaultPrice = parseFloat(opt.dataset.price) || 0;
+
+    // Set default price
+    document.getElementById('bPrice').value = defaultPrice > 0 ? defaultPrice.toFixed(2) : '';
+
+    var section = document.getElementById('variantSection');
+    var row = document.getElementById('variantRow');
+    var varLabel = document.getElementById('variantLabel');
+    row.innerHTML = '';
+
+    if (variants.length === 0 || (variants.length === 1 && variants[0].trim() === '')) {
+      section.style.display = 'none';
+      return;
+    }
+
+    // Label
+    if (variants.some(function(v){ return v.includes('Engrav'); })) {
+      varLabel.textContent = 'Finish';
+    } else if (variants.some(function(v){ return v.includes('£'); })) {
+      varLabel.textContent = 'Size';
+    } else if (variants.some(function(v){ return v === 'Matte' || v === 'Spot Gloss'; })) {
+      varLabel.textContent = 'Finish';
+    } else if (variants.some(function(v){ return v === 'Regular' || v === 'Slanted'; })) {
+      varLabel.textContent = 'Style';
+    } else {
+      varLabel.textContent = 'Option';
+    }
+
+    variants.forEach(function(v, i) {
+      v = v.trim();
+      var id = 'var_' + i;
+      row.innerHTML += '<input class="var-radio" type="radio" name="bVariant" id="' + id + '" value="' + v + '"' + (i === 0 ? ' checked' : '') + ' onchange="onVariantChange()">' +
+                       '<label class="var-pill" for="' + id + '">' + v + '</label>';
+    });
+
+    section.style.display = 'block';
+
+    // Trigger price update for size variants
+    onVariantChange();
+  }
+
+  function onVariantChange() {
+    var checked = document.querySelector('input[name="bVariant"]:checked');
+    if (!checked) return;
+    var val = checked.value;
+    if (SIZE_PRICE_MAP[val] !== undefined) {
+      document.getElementById('bPrice').value = SIZE_PRICE_MAP[val].toFixed(2);
+    }
+  }
+
+  function addItem() {
+    var sel = document.getElementById('bProduct');
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt.value) { alert('Please select a product first.'); return; }
+
+    var product = opt.value;
+    var variantEl = document.querySelector('input[name="bVariant"]:checked');
+    var variant = variantEl ? variantEl.value : '';
+    var qty = parseInt(document.getElementById('bQty').value) || 1;
+    var price = parseFloat(document.getElementById('bPrice').value);
+    if (!price || price <= 0) { alert('Please enter a selling price.'); return; }
+
+    // Build display name
+    // Strip price from variant display if it contains £ (e.g. "Large — £95" → "Large")
+    var variantDisplay = variant.replace(/ — £\d+/, '').trim();
+    var name = product + (variantDisplay ? ' — ' + variantDisplay : '');
+
+    basket.push({ name: name, qty: qty, price: price });
+    renderBasket();
+
+    // Reset builder
+    document.getElementById('bProduct').value = '';
+    document.getElementById('bQty').value = '1';
+    document.getElementById('bPrice').value = '';
+    document.getElementById('variantSection').style.display = 'none';
+    document.getElementById('variantRow').innerHTML = '';
+  }
+
+  function renderBasket() {
+    var container = document.getElementById('basket');
+
+    if (basket.length === 0) {
+      container.innerHTML = '<div class="empty-basket" id="emptyMsg">No items yet — add a product below</div>';
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = 'Add items to submit';
+      calcTotal();
+      return;
+    }
+
+    container.innerHTML = basket.map(function(item, i) {
+      var lineTotal = (item.qty * item.price).toFixed(2);
+      return '<div class="basket-item">' +
+        '<div class="basket-item-info">' +
+          '<div class="basket-item-name">' + item.name + '</div>' +
+          '<div class="basket-item-meta">Qty ' + item.qty + ' &times; £' + item.price.toFixed(2) + '</div>' +
+        '</div>' +
+        '<div class="basket-item-right">' +
+          '<div class="basket-item-price">£' + lineTotal + '</div>' +
+          '<button type="button" class="remove-btn" onclick="removeItem(' + i + ')">×</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = 'Submit order & send invoice →';
+    calcTotal();
+  }
+
+  function removeItem(i) {
+    basket.splice(i, 1);
+    renderBasket();
+  }
+
+  function calcTotal() {
+    var total = basket.reduce(function(sum, item) { return sum + item.qty * item.price; }, 0);
+    var pay = document.querySelector('input[name="pay"]:checked');
+    var isLopay = pay && pay.value === 'Lopay card';
+    var fee = isLopay ? total * 0.0099 + 0.08 : 0;
+    var net = total - fee;
+
+    document.getElementById('totalVal').textContent = '£' + total.toFixed(2);
+    var feeLine = document.getElementById('feeLine');
+    if (isLopay && fee > 0) {
+      feeLine.textContent = 'Lopay fee −£' + fee.toFixed(2) + ' → you keep £' + net.toFixed(2);
+      feeLine.style.display = 'block';
+    } else {
+      feeLine.style.display = 'none';
+    }
+  }
+
+  document.querySelectorAll('input[name="pay"]').forEach(function(r) {
+    r.addEventListener('change', calcTotal);
+  });
+
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzA6qsowDFR4X-uBzJKSgKicYqzav6XT7ju9TfFWXUOr4wyHcrTigSGy4_0sWP7Om7rEQ/exec';
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (basket.length === 0) { alert('Please add at least one product.'); return; }
+
+    var payEl = document.querySelector('input[name="pay"]:checked');
+    if (!payEl) { alert('Please select a payment method.'); return; }
+
+    var btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    var payload = {
+      company:       document.getElementById('company').value,
+      contact:       document.getElementById('contact').value,
+      email:         document.getElementById('email').value,
+      phone:         document.getElementById('phone').value,
+      address:       document.getElementById('address').value,
+      basket:        basket,
+      paymentMethod: payEl.value,
+      paymentStatus: document.getElementById('paystatus').value,
+      notes:         document.getElementById('notes').value
+    };
+
+    // GET request avoids CORS issues with Apps Script
+    var encoded = SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify(payload));
+    var script = document.createElement('script');
+    script.onerror = script.onload = function() {
+      var company = payload.company;
+      var email   = payload.email;
+      var total   = basket.reduce(function(s, i) { return s + i.qty * i.price; }, 0);
+      var summary = basket.map(function(i) { return i.name + ' x' + i.qty; }).join('\n');
+      document.getElementById('successDesc').textContent = company + '\n' + summary + '\n\nTotal £' + total.toFixed(2) + '\nInvoice sent to ' + email;
+      document.getElementById('successScreen').classList.add('show');
+      document.body.removeChild(script);
+    };
+    script.src = encoded;
+    document.body.appendChild(script);
+  }
+
+  function resetForm() {
+    document.getElementById('form').reset();
+    basket = [];
+    renderBasket();
+    document.getElementById('successScreen').classList.remove('show');
+    document.getElementById('variantSection').style.display = 'none';
+    document.getElementById('variantRow').innerHTML = '';
+    window.scrollTo(0, 0);
+  }
+</script>
+</body>
+</html>
