@@ -177,7 +177,7 @@
   textarea { resize: none; min-height: 52px; line-height: 1.5; }
 
   /* Category pills */
-  .cat-row { display: flex; gap: 6px; flex-wrap: nowrap; }
+  .cat-row { display: flex; gap: 6px; flex-wrap: wrap; }
   .cat-radio { display: none; }
   .cat-pill {
     padding: 6px 13px; border-radius: 20px;
@@ -192,6 +192,24 @@
     color: var(--accent);
     background: var(--accent-bg);
   }
+
+
+  .other-input {
+    margin-top: 10px;
+    width: 100%;
+    border: 1.5px solid var(--pill-border);
+    border-radius: 8px;
+    outline: none;
+    font-family: 'Figtree', sans-serif;
+    font-size: 15px;
+    color: var(--text);
+    background: var(--input-bg);
+    padding: 9px 12px;
+    transition: border-color 0.15s, background 0.2s;
+    display: none;
+  }
+  .other-input:focus { border-color: var(--accent); }
+  .other-input::placeholder { color: var(--text-ghost); }
 
   /* Submit */
   .submit-wrap {
@@ -244,7 +262,7 @@
 <body>
 
 <header>
-  <img src="https://emus25.github.io/orderform/logo.png" style="height:28px;width:auto;display:block;">
+  <img id="logoImg" src="https://emus25.github.io/orderform/logo.png" style="height:28px;width:auto;display:block;">
   <div class="header-right">
     <span class="header-badge">Expenses</span>
     <button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle dark mode"></button>
@@ -279,18 +297,19 @@
       <div class="group-label">Category</div>
       <div class="field">
         <div class="cat-row">
-          <input class="cat-radio" type="radio" name="category" id="cat1" value="Petrol" required>
+          <input class="cat-radio" type="radio" name="category" id="cat1" value="Petrol" required onchange="onCatChange()">
           <label class="cat-pill" for="cat1">⛽️ Petrol</label>
 
-          <input class="cat-radio" type="radio" name="category" id="cat2" value="Product Cost">
+          <input class="cat-radio" type="radio" name="category" id="cat2" value="Product Cost" onchange="onCatChange()">
           <label class="cat-pill" for="cat2">Product Cost 💷</label>
 
-          <input class="cat-radio" type="radio" name="category" id="cat3" value="BNI Fee">
+          <input class="cat-radio" type="radio" name="category" id="cat3" value="BNI Fee" onchange="onCatChange()">
           <label class="cat-pill" for="cat3">BNI Fee 🔴</label>
 
-          <input class="cat-radio" type="radio" name="category" id="cat4" value="Other">
+          <input class="cat-radio" type="radio" name="category" id="cat4" value="Other" onchange="onCatChange()">
           <label class="cat-pill" for="cat4">Other</label>
         </div>
+        <input class="other-input" type="text" id="otherInput" placeholder="e.g. Parking, Insurance…" autocomplete="off">
       </div>
     </div>
 
@@ -329,7 +348,11 @@
   // Persist theme across sessions
   (function() {
     var saved = localStorage.getItem('eb-theme');
-    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+      // Apply logo after DOM ready
+      window.addEventListener('DOMContentLoaded', function() { updateLogo(saved); });
+    }
   })();
 
   function toggleTheme() {
@@ -337,6 +360,22 @@
     var next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('eb-theme', next);
+    updateLogo(next);
+  }
+
+  function updateLogo(theme) {
+    var logo = document.getElementById('logoImg');
+    if (!logo) return;
+    logo.src = theme === 'dark'
+      ? 'https://emus25.github.io/orderform/logowhite.png'
+      : 'https://emus25.github.io/orderform/logo.png';
+  }
+
+  function onCatChange() {
+    var otherChecked = document.getElementById('cat4').checked;
+    var otherInput = document.getElementById('otherInput');
+    otherInput.style.display = otherChecked ? 'block' : 'none';
+    if (otherChecked) otherInput.focus();
   }
 
   function onAmountInput() {
@@ -363,7 +402,7 @@
     var payload = {
       action:      'logExpense',
       date:        dateStr,
-      category:    catEl.value,
+      category:    (catEl.value === 'Other' && document.getElementById('otherInput').value) ? document.getElementById('otherInput').value : catEl.value,
       description: document.getElementById('description').value,
       notes:       document.getElementById('notes').value,
       amount:      amount.toFixed(2)
@@ -387,6 +426,7 @@
   function resetForm() {
     document.getElementById('form').reset();
     document.getElementById('symbol').classList.remove('active');
+    document.getElementById('otherInput').style.display = 'none';
     document.getElementById('submitBtn').disabled = false;
     document.getElementById('submitBtn').textContent = 'Log expense →';
     document.getElementById('successScreen').classList.remove('show');
