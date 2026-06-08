@@ -33,6 +33,20 @@
   .badge-good { background: #f0f0ee; color: #555; }
   .badge-meh  { background: #fff8f0; color: #92400E; }
 
+
+  /* WhatsApp section */
+  .wa-section { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e8e8e5; }
+  .wa-section p { font-size: 13px; color: #888; margin-bottom: 12px; line-height: 1.5; }
+  .wa-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #25D366; color: #fff; border: none; border-radius: 10px;
+    padding: 12px 22px; font-family: 'Figtree', sans-serif;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    text-decoration: none; transition: opacity 0.15s;
+  }
+  .wa-btn:active { opacity: 0.85; }
+  .wa-icon { font-size: 18px; }
+
   /* Drop zone */
   .drop-zone {
     background: #fff;
@@ -171,6 +185,14 @@
 
   <!-- Submit -->
   <button class="submit-btn" id="submitBtn" disabled onclick="uploadFile()">Upload logo →</button>
+
+  <!-- WhatsApp fallback -->
+  <div class="wa-section">
+    <p>Don't have a logo? Want something different?<br>We're happy to help — just message us.</p>
+    <a class="wa-btn" href="https://wa.me/447754888841?text=Hi%20Ediz%2C%20I%20need%20some%20help%20with%20my%20logo%20for%20my%20ExposureBoost%20card." target="_blank">
+      <span class="wa-icon">💬</span> Message us on WhatsApp
+    </a>
+  </div>
 
 </div>
 
