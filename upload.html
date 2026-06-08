@@ -15,12 +15,10 @@
 
   .page { padding: 24px 20px 60px; max-width: 520px; margin: 0 auto; }
 
-  /* Greeting */
   .greeting { margin-bottom: 20px; }
   .greeting h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
   .greeting p { font-size: 14px; color: #888; line-height: 1.6; }
 
-  /* Format guide */
   .formats { background: #fff; border-radius: 12px; border: 1px solid #e8e8e5; overflow: hidden; margin-bottom: 16px; }
   .format-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-bottom: 1px solid #f0f0ee; }
   .format-row:last-child { border-bottom: none; }
@@ -33,31 +31,10 @@
   .badge-good { background: #f0f0ee; color: #555; }
   .badge-meh  { background: #fff8f0; color: #92400E; }
 
-
-  /* WhatsApp section */
-  .wa-section { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e8e8e5; }
-  .wa-section p { font-size: 13px; color: #888; margin-bottom: 12px; line-height: 1.5; }
-  .wa-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: #25D366; color: #fff; border: none; border-radius: 10px;
-    padding: 12px 22px; font-family: 'Figtree', sans-serif;
-    font-size: 14px; font-weight: 600; cursor: pointer;
-    text-decoration: none; transition: opacity 0.15s;
-  }
-  .wa-btn:active { opacity: 0.85; }
-  .wa-icon { font-size: 18px; }
-
-  /* Drop zone */
   .drop-zone {
-    background: #fff;
-    border: 2px dashed #e0e0dd;
-    border-radius: 12px;
-    padding: 40px 20px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-    margin-bottom: 16px;
-    position: relative;
+    background: #fff; border: 2px dashed #e0e0dd; border-radius: 12px;
+    padding: 40px 20px; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s; margin-bottom: 16px; position: relative;
   }
   .drop-zone.drag-over { border-color: #22a06b; background: #f0faf5; }
   .drop-zone.has-file  { border-color: #22a06b; border-style: solid; }
@@ -67,17 +44,7 @@
   .drop-sub span { color: #22a06b; font-weight: 500; }
   #fileInput { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 
-  /* File preview */
-  .file-preview {
-    display: none;
-    background: #fff;
-    border-radius: 12px;
-    border: 1px solid #e8e8e5;
-    padding: 14px 16px;
-    margin-bottom: 16px;
-    align-items: center;
-    gap: 12px;
-  }
+  .file-preview { display: none; background: #fff; border-radius: 12px; border: 1px solid #e8e8e5; padding: 14px 16px; margin-bottom: 16px; align-items: center; gap: 12px; }
   .file-preview.show { display: flex; }
   .file-icon { font-size: 28px; flex-shrink: 0; }
   .file-info { flex: 1; min-width: 0; }
@@ -86,32 +53,29 @@
   .file-remove { background: none; border: none; color: #ccc; font-size: 20px; cursor: pointer; padding: 0; flex-shrink: 0; }
   .file-remove:hover { color: #e53e3e; }
 
-  /* Progress */
   .progress-wrap { display: none; margin-bottom: 16px; }
   .progress-wrap.show { display: block; }
   .progress-bar-bg { background: #f0f0ee; border-radius: 20px; height: 6px; overflow: hidden; margin-bottom: 6px; }
   .progress-bar { background: #22a06b; height: 6px; border-radius: 20px; width: 0%; transition: width 0.3s; }
   .progress-label { font-size: 12px; color: #888; text-align: center; }
 
-  /* Submit */
-  .submit-btn {
-    width: 100%; background: #1a1a1a; color: #fff; border: none; border-radius: 10px;
-    padding: 15px; font-family: 'Figtree', sans-serif; font-size: 15px; font-weight: 600;
-    cursor: pointer; transition: opacity 0.15s; letter-spacing: -0.01em;
-  }
+  .error-msg { display: none; background: #fff8f0; border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #92400E; margin-bottom: 16px; line-height: 1.5; }
+  .error-msg.show { display: block; }
+
+  .submit-btn { width: 100%; background: #1a1a1a; color: #fff; border: none; border-radius: 10px; padding: 15px; font-family: 'Figtree', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; letter-spacing: -0.01em; }
   .submit-btn:active { opacity: 0.8; }
   .submit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  /* Success */
+  .wa-section { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e8e8e5; }
+  .wa-section p { font-size: 13px; color: #888; margin-bottom: 12px; line-height: 1.5; }
+  .wa-btn { display: inline-flex; align-items: center; gap: 8px; background: #25D366; color: #fff; border: none; border-radius: 10px; padding: 12px 22px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; transition: opacity 0.15s; }
+  .wa-btn:active { opacity: 0.85; }
+
   .success { display: none; position: fixed; inset: 0; background: #fff; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; text-align: center; z-index: 999; }
   .success.show { display: flex; }
   .tick { width: 64px; height: 64px; background: #f0faf5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 24px; }
   .success h2 { font-size: 22px; font-weight: 600; margin-bottom: 10px; letter-spacing: -0.02em; }
   .success p { font-size: 14px; color: #888; line-height: 1.7; max-width: 320px; }
-
-  /* Error */
-  .error-msg { display: none; background: #fff8f0; border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #92400E; margin-bottom: 16px; line-height: 1.5; }
-  .error-msg.show { display: block; }
 </style>
 </head>
 <body>
@@ -122,13 +86,11 @@
 </header>
 
 <div class="page">
-
   <div class="greeting">
     <h1>Upload your logo 🎨</h1>
-    <p>We need your logo to get started on your card design. Upload it below and we'll take it from there.</p>
+    <p id="greetingText">We need your logo to get started on your card design.</p>
   </div>
 
-  <!-- Format guide -->
   <div class="formats">
     <div class="format-row">
       <div class="format-emoji">🏆</div>
@@ -156,18 +118,15 @@
     </div>
   </div>
 
-  <!-- Error message -->
   <div class="error-msg" id="errorMsg"></div>
 
-  <!-- Drop zone -->
   <div class="drop-zone" id="dropZone">
-    <input type="file" id="fileInput" accept=".png,.pdf,.jpg,.jpeg,.svg,.ai,.eps" onchange="onFileSelect(this.files[0])">
+    <input type="file" id="fileInput" accept="image/*,.pdf,.svg,.ai,.eps" onchange="onFileSelect(this.files[0])">
     <div class="drop-icon">📁</div>
     <div class="drop-title">Tap to choose your logo</div>
-    <div class="drop-sub">or drag and drop it here · <span>any format welcome</span></div>
+    <div class="drop-sub">or drag and drop · <span>any format welcome</span></div>
   </div>
 
-  <!-- File preview -->
   <div class="file-preview" id="filePreview">
     <div class="file-icon" id="fileIcon">📄</div>
     <div class="file-info">
@@ -177,45 +136,43 @@
     <button class="file-remove" onclick="removeFile()" type="button">×</button>
   </div>
 
-  <!-- Progress -->
   <div class="progress-wrap" id="progressWrap">
     <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
     <div class="progress-label" id="progressLabel">Uploading…</div>
   </div>
 
-  <!-- Submit -->
   <button class="submit-btn" id="submitBtn" disabled onclick="uploadFile()">Upload logo →</button>
 
-  <!-- WhatsApp fallback -->
   <div class="wa-section">
     <p>Don't have a logo? Want something different?<br>We're happy to help — just message us.</p>
     <a class="wa-btn" href="https://wa.me/447754888841?text=Hi%20Ediz%2C%20I%20need%20some%20help%20with%20my%20logo%20for%20my%20ExposureBoost%20card." target="_blank">
-      <span class="wa-icon">💬</span> Message us on WhatsApp
+      💬 Message us on WhatsApp
     </a>
   </div>
-
 </div>
 
-<!-- Success -->
 <div class="success" id="successScreen">
   <div class="tick">✓</div>
   <h2>Logo received!</h2>
-  <p>We've got it and we're getting started on your design. We'll be in touch on WhatsApp once your card is on its way.</p>
+  <p>We've got it and we're getting started on your design. We'll message you on WhatsApp once your card is on its way.</p>
 </div>
 
 <script>
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxS6ztcLW8qzTjK2M2QUJxD5QKMz5Dqid69-jpXCU2rNFEePSeKrzRRBHpzA8t0YOhHDA/exec';
 
-  // Parse invoice number and folder ID from URL
-  var params     = new URLSearchParams(window.location.search);
-  var invNumber  = params.get('inv')    || '';
-  var folderId   = params.get('folder') || '';
+  var params   = new URLSearchParams(window.location.search);
+  var invNum   = params.get('inv')   || '';
+  var company  = params.get('co')    || '';
+  var items    = params.get('items') || '';
 
-  document.getElementById('invBadge').textContent = invNumber || 'ExposureBoost';
+  document.getElementById('invBadge').textContent = invNum || 'ExposureBoost';
+  if (company) {
+    document.getElementById('greetingText').textContent =
+      'Hi ' + company + ' — we need your logo to get started on your card design.';
+  }
 
   var selectedFile = null;
 
-  // Drag and drop
   var dz = document.getElementById('dropZone');
   dz.addEventListener('dragover',  function(e) { e.preventDefault(); dz.classList.add('drag-over'); });
   dz.addEventListener('dragleave', function()  { dz.classList.remove('drag-over'); });
@@ -228,14 +185,11 @@
   function onFileSelect(file) {
     if (!file) return;
     selectedFile = file;
-
-    // File icon by type
-    var ext = file.name.split('.').pop().toLowerCase();
-    var icons = { png: '🖼️', jpg: '📸', jpeg: '📸', pdf: '📋', svg: '✏️', ai: '🎨', eps: '🎨' };
+    var ext   = file.name.split('.').pop().toLowerCase();
+    var icons = { png:'🖼️', jpg:'📸', jpeg:'📸', pdf:'📋', svg:'✏️', ai:'🎨', eps:'🎨' };
     document.getElementById('fileIcon').textContent = icons[ext] || '📄';
     document.getElementById('fileName').textContent = file.name;
     document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
-
     document.getElementById('filePreview').classList.add('show');
     document.getElementById('dropZone').classList.add('has-file');
     document.getElementById('submitBtn').disabled = false;
@@ -258,7 +212,7 @@
 
   function uploadFile() {
     if (!selectedFile) return;
-    if (!invNumber || !folderId) {
+    if (!invNum) {
       showError('This upload link looks incomplete. Please use the link from your order confirmation email.');
       return;
     }
@@ -266,7 +220,6 @@
     var btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.textContent = 'Uploading…';
-
     document.getElementById('progressWrap').classList.add('show');
     document.getElementById('progressBar').style.width = '0%';
     document.getElementById('progressLabel').textContent = 'Reading file…';
@@ -276,20 +229,20 @@
       document.getElementById('progressBar').style.width = '40%';
       document.getElementById('progressLabel').textContent = 'Sending to server…';
 
-      var base64 = e.target.result.split(',')[1];
+      var base64  = e.target.result.split(',')[1];
       var payload = {
-        action:     'uploadLogo',
-        inv:        invNumber,
-        folderId:   folderId,
-        fileName:   selectedFile.name,
-        mimeType:   selectedFile.type || 'application/octet-stream',
-        fileData:   base64
+        action:   'uploadLogo',
+        inv:      invNum,
+        company:  company,
+        items:    items,
+        fileName: selectedFile.name,
+        mimeType: selectedFile.type || 'application/octet-stream',
+        fileData: base64
       };
 
-      // Use fetch for file upload (not JSONP — file data too large for URL)
       fetch(SCRIPT_URL, {
-        method:  'POST',
-        body:    JSON.stringify(payload)
+        method: 'POST',
+        body:   JSON.stringify(payload)
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -303,7 +256,7 @@
         btn.disabled = false;
         btn.textContent = 'Upload logo →';
         document.getElementById('progressWrap').classList.remove('show');
-        showError('Upload failed — please try again or send your logo directly to ediz@exposureboost.com');
+        showError('Upload failed — please try again or send your logo to ediz@exposureboost.com');
       });
     };
 
