@@ -161,9 +161,10 @@
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzAq9ZDyahuSUK3nBs7Hh8-sHHm4Lgk2rZ_t36TypuadIsDF_wz-Odkse2AFCJaQWj-/exec';
 
   var params   = new URLSearchParams(window.location.search);
-  var invNum   = params.get('inv')   || '';
-  var company  = params.get('co')    || '';
-  var items    = params.get('items') || '';
+  var invNum      = params.get('inv')   || '';
+  var company     = params.get('co')    || '';
+  var items       = params.get('items') || '';
+  var allProducts = params.get('all')   || '';
 
   document.getElementById('invBadge').textContent = invNum || 'ExposureBoost';
   if (company) {
@@ -231,13 +232,14 @@
 
       var base64  = e.target.result.split(',')[1];
       var payload = {
-        action:   'uploadLogo',
-        inv:      invNum,
-        company:  company,
-        items:    items,
-        fileName: selectedFile.name,
-        mimeType: selectedFile.type || 'application/octet-stream',
-        fileData: base64
+        action:       'uploadLogo',
+        inv:          invNum,
+        company:      company,
+        items:        items,
+        all_products: allProducts,
+        fileName:     selectedFile.name,
+        mimeType:     selectedFile.type || 'application/octet-stream',
+        fileData:     base64
       };
 
       fetch(SCRIPT_URL, {
