@@ -36,6 +36,15 @@
     border: 1px solid #e0e0dd; border-radius: 10px; background: #fff; color: #1a1a1a;
   }
   .step-body input[type=text]:focus { outline: none; border-color: #22a06b; }
+  .step-body input[type=text].invalid, .drop-zone.invalid { border-color: #e53e3e !important; }
+
+  @keyframes shake {
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60% { transform: translateX(4px); }
+  }
+  .shake { animation: shake 0.4s; }
 
   .error-msg { display: none; background: #fff8f0; border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #92400E; margin-bottom: 16px; line-height: 1.5; }
   .error-msg.show { display: block; }
@@ -73,6 +82,18 @@
   .submit-btn:active { opacity: 0.8; }
   .submit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+  .help-section { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e8e8e5; }
+  .help-section p { font-size: 13px; color: #888; margin-bottom: 12px; line-height: 1.5; }
+  .wa-btn {
+    display: inline-flex; align-items: center; gap: 8px; background: #25D366; color: #fff;
+    border: none; border-radius: 10px; padding: 12px 22px; font-family: 'Figtree', sans-serif;
+    font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none;
+    transition: opacity 0.15s; margin-bottom: 10px;
+  }
+  .wa-btn:active { opacity: 0.85; }
+  .help-email { font-size: 13px; }
+  .help-email a { color: #555; text-decoration: underline; }
+
   .success { display: none; position: fixed; inset: 0; background: #fff; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; text-align: center; z-index: 999; }
   .success.show { display: flex; }
   .tick { width: 60px; height: 60px; background: #22a06b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
@@ -84,7 +105,7 @@
 <body>
 
 <header>
-  <img src="https://emus25.github.io/orderform/logo.png" alt="ExposureBoost">
+  <img src="logowhite.png" alt="ExposureBoost">
 </header>
 
 <div class="page">
@@ -131,7 +152,7 @@
       <div class="drop-zone" id="dropZone">
         <input type="file" id="fileInput" accept="image/*,.pdf,.svg,.ai,.eps" onchange="onFileSelect(this.files[0])">
         <div class="drop-title">Tap to choose your logo</div>
-        <div class="drop-sub">or drag and drop &middot; any format welcome</div>
+        <div class="drop-sub">or drag and drop &middot; transparent PNG preferred &middot; max 8MB</div>
       </div>
       <div class="file-preview" id="filePreview">
         <div class="file-info">
@@ -148,7 +169,13 @@
     <div class="progress-label" id="progressLabel">Uploading…</div>
   </div>
 
-  <button class="submit-btn" id="submitBtn" disabled onclick="uploadFile()">Submit</button>
+  <button class="submit-btn" id="submitBtn" onclick="uploadFile()">Submit</button>
+
+  <div class="help-section">
+    <p>Having trouble? Message Ediz now.</p>
+    <a class="wa-btn" href="https://wa.me/447754888841?text=Hi%20Ediz%2C%20I%27m%20having%20trouble%20with%20the%20BNI%20Elmbridge%20name%20badge%20form." target="_blank">Message on WhatsApp</a>
+    <div class="help-email"><a href="mailto:ediz@exposureboost.com">ediz@exposureboost.com</a></div>
+  </div>
 </div>
 
 <div class="success" id="successScreen">
@@ -160,6 +187,7 @@
 <script>
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzAq9ZDyahuSUK3nBs7Hh8-sHHm4Lgk2rZ_t36TypuadIsDF_wz-Odkse2AFCJaQWj-/exec';
   var EVENT_NAME = 'BNI Elmbridge — 24 Jul 2026';
+  var MAX_FILE_BYTES = 8 * 1024 * 1024;
 
   var selectedFile = null;
 
@@ -174,20 +202,27 @@
 
   function onFileSelect(file) {
     if (!file) return;
+
+    if (file.size > MAX_FILE_BYTES) {
+      showError('That logo is too large — please use a file under 8MB.');
+      shakeField(dz);
+      document.getElementById('fileInput').value = '';
+      return;
+    }
+
     selectedFile = file;
     document.getElementById('fileName').textContent = file.name;
     document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
     document.getElementById('filePreview').classList.add('show');
-    document.getElementById('dropZone').classList.add('has-file');
-    document.getElementById('submitBtn').disabled = false;
+    dz.classList.add('has-file');
+    dz.classList.remove('invalid');
     document.getElementById('errorMsg').classList.remove('show');
   }
 
   function removeFile() {
     selectedFile = null;
     document.getElementById('filePreview').classList.remove('show');
-    document.getElementById('dropZone').classList.remove('has-file');
-    document.getElementById('submitBtn').disabled = true;
+    dz.classList.remove('has-file');
     document.getElementById('fileInput').value = '';
   }
 
@@ -197,17 +232,32 @@
     el.classList.add('show');
   }
 
-  function uploadFile() {
-    var name     = document.getElementById('fName').value.trim();
-    var category = document.getElementById('fCategory').value.trim();
-    var business = document.getElementById('fBusiness').value.trim();
+  function shakeField(el) {
+    el.classList.add('invalid', 'shake');
+    setTimeout(function () { el.classList.remove('shake'); }, 400);
+  }
 
-    if (!name || !business) {
-      showError('Please fill in your name and business name.');
-      return;
-    }
-    if (!selectedFile) {
-      showError('Please choose a logo file.');
+  function uploadFile() {
+    var nameEl     = document.getElementById('fName');
+    var categoryEl = document.getElementById('fCategory');
+    var businessEl = document.getElementById('fBusiness');
+
+    var name     = nameEl.value.trim();
+    var category = categoryEl.value.trim();
+    var business = businessEl.value.trim();
+
+    [nameEl, categoryEl, businessEl].forEach(function (el) { el.classList.remove('invalid'); });
+    dz.classList.remove('invalid');
+
+    var missing = [];
+    if (!name)     missing.push(nameEl);
+    if (!category) missing.push(categoryEl);
+    if (!business) missing.push(businessEl);
+    if (!selectedFile) missing.push(dz);
+
+    if (missing.length) {
+      missing.forEach(shakeField);
+      showError('Please fill in every field before submitting.');
       return;
     }
 
