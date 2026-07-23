@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BNI Elmbridge — Digital Name Badges</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Figtree', sans-serif; background: #f5f5f3; color: #1a1a1a; font-size: 16px; -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+
+  header { background: #1a1a1a; padding: 18px 20px; display: flex; align-items: center; justify-content: center; }
+  header img { height: 30px; width: auto; display: block; }
+
+  .page { padding: 28px 20px 60px; max-width: 540px; margin: 0 auto; }
+
+  .greeting { margin-bottom: 20px; text-align: center; }
+  .greeting h1 { font-size: 23px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .greeting p { font-size: 14px; color: #777; line-height: 1.6; }
+
+  .example-card { background: #fff; border-radius: 14px; border: 1px solid #e8e8e5; padding: 12px; margin-bottom: 28px; }
+  .example-card img { width: 100%; height: auto; display: block; border-radius: 8px; }
+  .example-caption { font-size: 12px; color: #999; text-align: center; margin-top: 10px; }
+
+  .step { display: flex; gap: 14px; margin-bottom: 18px; }
+  .step-num {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+    background: #1a1a1a; color: #fff; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-body { flex: 1; padding-top: 3px; }
+  .step-body label { display: block; font-size: 13px; font-weight: 600; color: #1a1a1a; margin-bottom: 7px; }
+  .step-body input[type=text] {
+    width: 100%; font-family: 'Figtree', sans-serif; font-size: 15px; padding: 13px 14px;
+    border: 1px solid #e0e0dd; border-radius: 10px; background: #fff; color: #1a1a1a;
+  }
+  .step-body input[type=text]:focus { outline: none; border-color: #22a06b; }
+
+  .error-msg { display: none; background: #fff8f0; border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #92400E; margin-bottom: 16px; line-height: 1.5; }
+  .error-msg.show { display: block; }
+
+  .drop-zone {
+    background: #fff; border: 2px dashed #e0e0dd; border-radius: 12px;
+    padding: 30px 20px; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s; position: relative;
+  }
+  .drop-zone.drag-over { border-color: #22a06b; background: #f0faf5; }
+  .drop-zone.has-file  { border-color: #22a06b; border-style: solid; }
+  .drop-title { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 3px; }
+  .drop-sub { font-size: 12px; color: #999; }
+  #fileInput { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+  .file-preview { display: none; background: #fff; border-radius: 12px; border: 1px solid #e8e8e5; padding: 14px 16px; margin-top: 12px; align-items: center; gap: 12px; }
+  .file-preview.show { display: flex; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 14px; font-weight: 500; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { font-size: 12px; color: #888; margin-top: 2px; }
+  .file-remove { background: none; border: none; color: #ccc; font-size: 20px; cursor: pointer; padding: 0; flex-shrink: 0; line-height: 1; }
+  .file-remove:hover { color: #e53e3e; }
+
+  .progress-wrap { display: none; margin-top: 16px; }
+  .progress-wrap.show { display: block; }
+  .progress-bar-bg { background: #f0f0ee; border-radius: 20px; height: 6px; overflow: hidden; margin-bottom: 6px; }
+  .progress-bar { background: #22a06b; height: 6px; border-radius: 20px; width: 0%; transition: width 0.3s; }
+  .progress-label { font-size: 12px; color: #888; text-align: center; }
+
+  .submit-btn {
+    width: 100%; background: #1a1a1a; color: #fff; border: none; border-radius: 10px;
+    padding: 16px; font-family: 'Figtree', sans-serif; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s; letter-spacing: -0.01em; margin-top: 8px;
+  }
+  .submit-btn:active { opacity: 0.8; }
+  .submit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .success { display: none; position: fixed; inset: 0; background: #fff; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; text-align: center; z-index: 999; }
+  .success.show { display: flex; }
+  .tick { width: 60px; height: 60px; background: #22a06b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
+  .tick svg { width: 26px; height: 26px; }
+  .success h2 { font-size: 22px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.02em; }
+  .success p { font-size: 14px; color: #888; line-height: 1.7; max-width: 320px; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="https://emus25.github.io/orderform/logo.png" alt="ExposureBoost">
+</header>
+
+<div class="page">
+  <div class="greeting">
+    <h1>Get your digital name badge</h1>
+    <p>BNI Elmbridge &middot; fill in the details below and we'll build your badge</p>
+  </div>
+
+  <div class="example-card">
+    <img src="bni-badge-example.png" alt="Example digital name badge showing where each field appears">
+    <div class="example-caption">This is what your finished badge will look like</div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <label for="fName">Name</label>
+      <input type="text" id="fName" placeholder="Add your full name here">
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <label for="fCategory">Business category / title</label>
+      <input type="text" id="fCategory" placeholder="Add your job title or business category here">
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <label for="fBusiness">Business name</label>
+      <input type="text" id="fBusiness" placeholder="Add your business name here">
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <label>Company logo</label>
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept="image/*,.pdf,.svg,.ai,.eps" onchange="onFileSelect(this.files[0])">
+        <div class="drop-title">Tap to choose your logo</div>
+        <div class="drop-sub">or drag and drop &middot; any format welcome</div>
+      </div>
+      <div class="file-preview" id="filePreview">
+        <div class="file-info">
+          <div class="file-name" id="fileName"></div>
+          <div class="file-size" id="fileSize"></div>
+        </div>
+        <button class="file-remove" onclick="removeFile()" type="button">&times;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-label" id="progressLabel">Uploading…</div>
+  </div>
+
+  <button class="submit-btn" id="submitBtn" disabled onclick="uploadFile()">Submit</button>
+</div>
+
+<div class="success" id="successScreen">
+  <div class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+  <h2>Got it</h2>
+  <p>Thanks — we've received your details and logo. Your digital name badge is on its way.</p>
+</div>
+
+<script>
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzAq9ZDyahuSUK3nBs7Hh8-sHHm4Lgk2rZ_t36TypuadIsDF_wz-Odkse2AFCJaQWj-/exec';
+  var EVENT_NAME = 'BNI Elmbridge — 24 Jul 2026';
+
+  var selectedFile = null;
+
+  var dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover',  function(e) { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', function()  { dz.classList.remove('drag-over'); });
+  dz.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) onFileSelect(e.dataTransfer.files[0]);
+  });
+
+  function onFileSelect(file) {
+    if (!file) return;
+    selectedFile = file;
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+    document.getElementById('filePreview').classList.add('show');
+    document.getElementById('dropZone').classList.add('has-file');
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('errorMsg').classList.remove('show');
+  }
+
+  function removeFile() {
+    selectedFile = null;
+    document.getElementById('filePreview').classList.remove('show');
+    document.getElementById('dropZone').classList.remove('has-file');
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('fileInput').value = '';
+  }
+
+  function showError(msg) {
+    var el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  function uploadFile() {
+    var name     = document.getElementById('fName').value.trim();
+    var category = document.getElementById('fCategory').value.trim();
+    var business = document.getElementById('fBusiness').value.trim();
+
+    if (!name || !business) {
+      showError('Please fill in your name and business name.');
+      return;
+    }
+    if (!selectedFile) {
+      showError('Please choose a logo file.');
+      return;
+    }
+
+    var btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    document.getElementById('progressWrap').classList.add('show');
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressLabel').textContent = 'Reading file…';
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('progressBar').style.width = '40%';
+      document.getElementById('progressLabel').textContent = 'Sending to server…';
+
+      var base64  = e.target.result.split(',')[1];
+      var payload = {
+        action:       'bniBadgeUpload',
+        eventName:    EVENT_NAME,
+        name:         name,
+        businessName: business,
+        category:     category,
+        fileName:     selectedFile.name,
+        mimeType:     selectedFile.type || 'application/octet-stream',
+        fileData:     base64
+      };
+
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        body:   JSON.stringify(payload)
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressLabel').textContent = 'Done!';
+        setTimeout(function() {
+          document.getElementById('successScreen').classList.add('show');
+        }, 400);
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'Submit';
+        document.getElementById('progressWrap').classList.remove('show');
+        showError('Upload failed — please try again or message ediz@exposureboost.com');
+      });
+    };
+
+    reader.onerror = function() {
+      showError('Could not read the file. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Submit';
+    };
+
+    reader.readAsDataURL(selectedFile);
+  }
+</script>
+</body>
+</html>
