@@ -251,6 +251,7 @@
       </div>
 
       <div id="itemsContainer"></div>
+      <datalist id="catalogDatalist"></datalist>
 
       <button type="button" class="add-item-btn" onclick="addItemRow()">+ Add another item</button>
 
@@ -543,6 +544,17 @@
 
   var itemRowCount = 0;
 
+  // Read straight from the Confirmed Order dropdown's <option> values — the
+  // one place the real catalog is actually defined — so Draft Invoice's item
+  // field can offer the same names as autocomplete without a second copy of
+  // the list to keep in sync.
+  var CATALOG_NAMES = Array.prototype.map.call(
+    document.querySelectorAll('#coProduct option[value]:not([value=""])'),
+    function (opt) { return opt.value; }
+  );
+  document.getElementById('catalogDatalist').innerHTML =
+    CATALOG_NAMES.map(function (n) { return '<option value="' + n.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">'; }).join('');
+
   function setTab(t) {
     document.getElementById('btnDraft').classList.toggle('active', t === 'draft');
     document.getElementById('btnConfirmed').classList.toggle('active', t === 'confirmed');
@@ -619,13 +631,38 @@
     convertingDraftRef = inv.ref;
     document.getElementById('coCompany').value = inv.company || '';
     document.getElementById('coEmail').value = inv.email || '';
-    document.getElementById('coQuickline').value = inv.itemsStr || '';
     document.getElementById('coPs1').checked = true; // "Paid in full" — this is a paid draft being closed out
+
+    // Draft items that are already exact catalog names (thanks to catalog
+    // matching at dictation time) get added to the basket automatically —
+    // no re-selecting. Only genuinely custom items need a hand: they're
+    // dropped into the dictation box so one tap of Parse handles the rest.
+    coBasket = [];
+    var sel = document.getElementById('coProduct');
+    var unmatched = [];
+    (inv.items || []).forEach(function (it) {
+      var name = it.name || it.item || '';
+      var matched = false;
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === name) { matched = true; break; }
+      }
+      if (matched) {
+        sel.value = name;
+        onCoProductChange();
+        document.getElementById('coQty').value = it.qty || 1;
+        addCoItem();
+      } else if (name) {
+        unmatched.push(name + (it.qty ? ' x' + it.qty : ''));
+      }
+    });
+    renderCoBasket();
+    document.getElementById('coQuickline').value = unmatched.join(', ');
 
     var banner = document.getElementById('convertBanner');
     banner.style.display = 'flex';
-    document.getElementById('convertBannerText').textContent =
-      'Closing out draft ' + inv.ref + ' (' + inv.company + ') — dictate or add the items below, then submit.';
+    document.getElementById('convertBannerText').textContent = unmatched.length
+      ? 'Closing out draft ' + inv.ref + ' (' + inv.company + ') — ' + unmatched.length + ' item(s) need matching below.'
+      : 'Closing out draft ' + inv.ref + ' (' + inv.company + ') — items already matched, just confirm and submit.';
 
     setTab('confirmed');
     window.scrollTo(0, 0);
@@ -646,7 +683,7 @@
     row.innerHTML =
       '<div class="item-row-head"><span>Item</span>' +
         '<button type="button" class="remove-item-btn" onclick="removeItemRow(' + id + ')">&times;</button></div>' +
-      '<div class="field"><label>Description</label><input type="text" class="fItem"></div>' +
+      '<div class="field"><label>Description</label><input type="text" class="fItem" list="catalogDatalist"></div>' +
       '<div class="row2">' +
         '<div class="field"><label>Qty</label><input type="number" class="fQty" min="0" step="1"></div>' +
         '<div class="field"><label>Unit price £</label><input type="number" class="fPrice" min="0" step="0.01"></div>' +
@@ -656,7 +693,7 @@
     row.querySelector('.fQty').addEventListener('input', updateTotal);
     row.querySelector('.fPrice').addEventListener('input', updateTotal);
     row.querySelector('.fItem').addEventListener('blur', function () {
-      this.value = canonicalizeItemName(this.value.trim());
+      this.value = titleCase(this.value.trim());
     });
 
     if (prefill) {
@@ -714,13 +751,16 @@
 
         document.getElementById('itemsContainer').innerHTML = '';
         itemRowCount = 0;
+        // The backend already matches spoken items against the real catalog
+        // (exact names, correct prices) — trust it as-is. Only genuinely
+        // custom items (no catalog match) come back as free text, which just
+        // needs title-casing to look right on the PDF.
         var items = (data.items && data.items.length) ? data.items : [{}];
         items.forEach(function (it) {
           var raw = it.item || '';
-          var canon = canonicalizeItemName(raw);
-          var itemText = (canon !== raw) ? canon : titleCase(raw);
+          var isCatalogMatch = CATALOG_NAMES.indexOf(raw) !== -1;
           addItemRow({
-            item: itemText,
+            item: isCatalogMatch ? raw : titleCase(raw),
             qty: it.qty || '',
             price: it.unitPrice || ''
           });
@@ -733,20 +773,6 @@
         btn.textContent = originalLabel;
         showError('Could not parse that — please fill in the fields below manually, or try rephrasing.');
       });
-  }
-
-  // Maps loose product mentions ("metal cards", "wood card", "table talker")
-  // to your actual catalog names. Anything that doesn't match a known
-  // product is left exactly as typed — never invents a name for a custom item.
-  function canonicalizeItemName(raw) {
-    var s = raw.toLowerCase();
-    if (/\bstands?\b|\btable\s*talkers?\b/.test(s)) return 'Digital Table Stand';
-    if (/\bkeyring/.test(s)) return 'NFC Keyring';
-    if (/\bmetal\b/.test(s)) return 'Metal Digital Business Card';
-    if (/\bplastic\b/.test(s)) return 'Plastic Digital Business Card';
-    if (/\bbamboo\b/.test(s)) return 'Bamboo Digital Business Card';
-    if (/\bwood(en)?\b/.test(s)) return 'Wood Digital Business Card';
-    return raw;
   }
 
   // "city piling" -> "City Piling" — so lazily-typed/dictated names still
