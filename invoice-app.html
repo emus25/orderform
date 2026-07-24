@@ -89,6 +89,17 @@
   .generate-btn:active { opacity: 0.8; }
   .generate-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+  .lock-screen { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .lock-box { width: 100%; max-width: 320px; background: #fff; border-radius: 14px; border: 1px solid #e8e8e5; padding: 24px; text-align: center; }
+  .lock-title { font-size: 15px; font-weight: 600; color: #666; margin-bottom: 14px; }
+  .lock-input {
+    width: 100%; font-family: 'Figtree', sans-serif; font-size: 15px; padding: 12px 14px;
+    border: 1px solid #e0e0dd; border-radius: 10px; background: #fff; color: #1a1a1a; margin-bottom: 10px;
+  }
+  .lock-input:focus { outline: none; border-color: #22a06b; }
+  .lock-error { display: none; font-size: 13px; color: #e53e3e; margin-bottom: 12px; }
+  .lock-error.show { display: block; }
+
   .success { display: none; position: fixed; inset: 0; background: #fff; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; text-align: center; z-index: 999; }
   .success.show { display: flex; }
   .tick { width: 60px; height: 60px; background: #22a06b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
@@ -204,7 +215,16 @@
   <img src="logowhite.png" alt="ExposureBoost">
 </header>
 
-<div class="page">
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-box">
+    <div class="lock-title">Enter password</div>
+    <input type="password" id="lockPasswordInput" class="lock-input" autocomplete="current-password">
+    <div class="lock-error" id="lockError"></div>
+    <button type="button" class="generate-btn" id="lockSubmitBtn" onclick="submitLockScreen()">Unlock</button>
+  </div>
+</div>
+
+<div class="page" id="appRoot" style="display:none">
   <div class="toggle" id="tabToggle">
     <button type="button" id="btnDraft" class="active" onclick="setTab('draft')">Draft Invoice</button>
     <button type="button" id="btnConfirmed" onclick="setTab('confirmed')">Confirmed Order</button>
@@ -458,6 +478,70 @@
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcMfHCK9FHp8RZXnJBDOQ-5vLheJT4g0vo7hC5-7wGyHYnbY2TpmXnC1qjLtBmTW92pA/exec';
   var SHEET_TOKEN = 'asdfgmhmtmrymnnrbvrf24t62452523.';
 
+  // The password itself is never stored in this file — it's typed by the
+  // user, checked against a value only Apps Script's Script Properties
+  // knows, and cached in this browser's localStorage so it isn't re-typed
+  // every visit. See checkDashboardPassword_ in Code.gs for the real check.
+  var EB_PW_KEY = 'eb_dashboard_password';
+
+  function getPassword() { return localStorage.getItem(EB_PW_KEY) || ''; }
+
+  function verifyPassword(pw, onResult) {
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'checkDashboardPassword', password: pw })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) { onResult(data.status === 'success'); })
+      .catch(function () { onResult(false); });
+  }
+
+  function lockApp(msg) {
+    localStorage.removeItem(EB_PW_KEY);
+    document.getElementById('lockScreen').style.display = 'flex';
+    document.getElementById('appRoot').style.display = 'none';
+    var err = document.getElementById('lockError');
+    if (msg) { err.textContent = msg; err.classList.add('show'); } else { err.classList.remove('show'); }
+    document.getElementById('lockPasswordInput').value = '';
+  }
+
+  function unlockApp() {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('appRoot').style.display = 'block';
+  }
+
+  function submitLockScreen() {
+    var pw = document.getElementById('lockPasswordInput').value;
+    var btn = document.getElementById('lockSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    verifyPassword(pw, function (ok) {
+      btn.disabled = false;
+      btn.textContent = 'Unlock';
+      if (ok) {
+        localStorage.setItem(EB_PW_KEY, pw);
+        unlockApp();
+      } else {
+        var err = document.getElementById('lockError');
+        err.textContent = 'Incorrect password.';
+        err.classList.add('show');
+      }
+    });
+  }
+
+  document.getElementById('lockPasswordInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') submitLockScreen();
+  });
+
+  // On load: if a password is already cached, verify it's still correct
+  // before showing anything (handles the case where it's since been
+  // changed) rather than trusting it blindly.
+  (function () {
+    var pw = getPassword();
+    if (!pw) return;
+    verifyPassword(pw, function (ok) { if (ok) unlockApp(); else lockApp('Session expired — please re-enter the password.'); });
+  })();
+
   var itemRowCount = 0;
 
   function setTab(t) {
@@ -483,10 +567,11 @@
 
     fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'listPendingQuickInvoices', token: SHEET_TOKEN })
+      body: JSON.stringify({ action: 'listPendingQuickInvoices', token: SHEET_TOKEN, password: getPassword() })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'failed');
         renderPendingInvoices(data.invoices || []);
       })
@@ -616,12 +701,13 @@
 
     fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'parseQuickInvoiceText', token: SHEET_TOKEN, text: text })
+      body: JSON.stringify({ action: 'parseQuickInvoiceText', token: SHEET_TOKEN, text: text, password: getPassword() })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         btn.disabled = false;
         btn.textContent = originalLabel;
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'parse failed');
 
         if (data.company) document.getElementById('fCompany').value = titleCase(data.company);
@@ -735,6 +821,7 @@
     var payload = {
       action:    'createQuickInvoice',
       token:     SHEET_TOKEN,
+      password:  getPassword(),
       docType:   'invoice',
       company:   company,
       email:     document.getElementById('fEmail').value.trim(),
@@ -746,6 +833,7 @@
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'failed');
 
         document.getElementById('successTitle').textContent = 'Draft invoice created';
@@ -816,12 +904,13 @@
 
     fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'parseConfirmedOrderText', token: SHEET_TOKEN, text: text })
+      body: JSON.stringify({ action: 'parseConfirmedOrderText', token: SHEET_TOKEN, text: text, password: getPassword() })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         btn.disabled = false;
         btn.textContent = originalLabel;
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'parse failed');
 
         if (data.company) document.getElementById('coCompany').value = data.company;
@@ -1060,6 +1149,7 @@
     if (payStatus === 'Partial deposit' && dep) payStatus = 'Partial deposit — £' + parseFloat(dep).toFixed(2);
 
     var payload = {
+      password:      getPassword(),
       company:       company,
       contact:       contact,
       email:         email,
@@ -1081,6 +1171,7 @@
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'failed');
 
         document.getElementById('coSuccessDesc').textContent = company + '\n' + summary + '\n\nTotal £' + total.toFixed(2) + '\nInvoice sent to ' + email;
