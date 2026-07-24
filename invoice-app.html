@@ -111,6 +111,9 @@
      names/prices and customer fields stay identical to the source of truth. */
   .co-badge { font-size: 12px; color: #888; background: #f0f0ee; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 16px; }
 
+  .convert-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #1d4ed8; line-height: 1.4; }
+  .convert-cancel-btn { flex-shrink: 0; background: #fff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 8px; padding: 6px 12px; font-family: 'Figtree', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
+
   .co-group { background: #fff; border-radius: 12px; border: 1px solid #e8e8e5; overflow: hidden; margin-bottom: 12px; }
   .co-group-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #aaa; padding: 12px 16px 4px; }
   .co-field { padding: 10px 16px; border-bottom: 1px solid #f0f0ee; }
@@ -260,6 +263,11 @@
   <!-- ══════════ CONFIRMED ORDER (mirrors the real order form) ══════════ -->
   <div id="confirmedScreen" style="display:none">
     <span class="co-badge" id="confirmedInvBadge">Next invoice: …</span>
+
+    <div class="convert-banner" id="convertBanner" style="display:none">
+      <span id="convertBannerText"></span>
+      <button type="button" class="convert-cancel-btn" onclick="cancelConvertDraft()">Cancel</button>
+    </div>
 
     <div class="card">
       <div class="card-label">Speak or type the order</div>
@@ -507,51 +515,41 @@
         '<div style="font-size:13px;color:#555;margin-bottom:10px">' + escapeHtml_(inv.itemsStr) + '</div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
           '<span style="font-size:16px;font-weight:600">£' + parseFloat(inv.total || 0).toFixed(2) + '</span>' +
-          '<button type="button" class="parse-btn mark-toggle-btn" style="width:auto;margin:0;padding:10px 16px">Mark Paid</button>' +
-        '</div>' +
-        '<div class="mark-panel" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #f0f0ee">' +
-          '<div class="field"><label>Contact name (optional)</label><input type="text" class="mpContact"></div>' +
-          '<div class="field"><label>Phone (optional)</label><input type="text" class="mpPhone"></div>' +
-          '<div class="field"><label>Address (optional)</label><input type="text" class="mpAddress"></div>' +
-          '<button type="button" class="generate-btn mp-confirm-btn" style="margin-top:10px">Confirm — Send Paid Invoice</button>' +
+          '<button type="button" class="parse-btn">Mark Paid</button>' +
         '</div>';
 
-      row.querySelector('.mark-toggle-btn').addEventListener('click', function () {
-        var panel = row.querySelector('.mark-panel');
-        panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
-      });
-      row.querySelector('.mp-confirm-btn').addEventListener('click', function () {
-        markPaid(inv.ref, this, row);
+      row.querySelector('button').addEventListener('click', function () {
+        startConvertDraft(inv);
       });
       list.appendChild(row);
     });
   }
 
-  function markPaid(ref, btn, row) {
-    btn.disabled = true;
-    var original = btn.textContent;
-    btn.textContent = 'Sending…';
+  // "Mark Paid" doesn't collect payment details itself — it hands off to the
+  // Confirmed Order tab (real catalog, real customer fields, real payment
+  // method) pre-filled with what the draft already knows, so one submit both
+  // closes out the draft and logs a proper order.
+  var convertingDraftRef = null;
 
-    var payload = {
-      action: 'markQuickInvoicePaid',
-      token: SHEET_TOKEN,
-      ref: ref,
-      contactName: row.querySelector('.mpContact').value.trim(),
-      phone: row.querySelector('.mpPhone').value.trim(),
-      address: row.querySelector('.mpAddress').value.trim()
-    };
+  function startConvertDraft(inv) {
+    convertingDraftRef = inv.ref;
+    document.getElementById('coCompany').value = inv.company || '';
+    document.getElementById('coEmail').value = inv.email || '';
+    document.getElementById('coQuickline').value = inv.itemsStr || '';
+    document.getElementById('coPs1').checked = true; // "Paid in full" — this is a paid draft being closed out
 
-    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.status !== 'success') throw new Error(data.message || 'failed');
-        row.innerHTML = '<div style="font-size:14px;color:#22a06b;font-weight:600;padding:6px 0">✓ Invoice #' + data.invoiceNumber + ' sent' + (data.emailed ? '' : ' (no email on file — forward the PDF yourself)') + '</div>';
-      })
-      .catch(function (err) {
-        btn.disabled = false;
-        btn.textContent = original;
-        showError('Could not mark as paid: ' + err.message);
-      });
+    var banner = document.getElementById('convertBanner');
+    banner.style.display = 'flex';
+    document.getElementById('convertBannerText').textContent =
+      'Closing out draft ' + inv.ref + ' (' + inv.company + ') — dictate or add the items below, then submit.';
+
+    setTab('confirmed');
+    window.scrollTo(0, 0);
+  }
+
+  function cancelConvertDraft() {
+    convertingDraftRef = null;
+    document.getElementById('convertBanner').style.display = 'none';
   }
 
   function addItemRow(prefill) {
@@ -1074,6 +1072,7 @@
       source:        document.getElementById('coSource').value.trim(),
       notes:         document.getElementById('coNotes').value.trim()
     };
+    if (convertingDraftRef) payload.draftRef = convertingDraftRef;
 
     var total   = coBasket.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
     var summary = coBasket.map(function (i) { return i.name + ' x' + i.qty; }).join('\n');
@@ -1087,6 +1086,10 @@
         document.getElementById('coSuccessDesc').textContent = company + '\n' + summary + '\n\nTotal £' + total.toFixed(2) + '\nInvoice sent to ' + email;
         document.getElementById('coSuccessInv').textContent = invoiceNumAtSubmit ? ('#' + invoiceNumAtSubmit) : '';
         document.getElementById('coSuccessScreen').classList.add('show');
+
+        convertingDraftRef = null;
+        document.getElementById('convertBanner').style.display = 'none';
+        loadPendingInvoices();
 
         coInvoiceNum = null;
         document.getElementById('confirmedInvBadge').textContent = 'Next invoice: …';
