@@ -226,8 +226,9 @@
 
 <div class="page" id="appRoot" style="display:none">
   <div class="toggle" id="tabToggle">
-    <button type="button" id="btnDraft" class="active" onclick="setTab('draft')">Draft Invoice</button>
-    <button type="button" id="btnConfirmed" onclick="setTab('confirmed')">Confirmed Order</button>
+    <button type="button" id="btnDraft" class="active" onclick="setTab('draft')">Draft</button>
+    <button type="button" id="btnConfirmed" onclick="setTab('confirmed')">Confirmed</button>
+    <button type="button" id="btnBni" onclick="setTab('bni')">BNI Badges</button>
   </div>
 
   <!-- ══════════ DRAFT INVOICE ══════════ -->
@@ -453,6 +454,29 @@
 
     <button class="generate-btn" id="coSubmitBtn" onclick="handleCoSubmit()" disabled>Add items to submit</button>
   </div>
+
+  <!-- ══════════ BNI BADGES ══════════ -->
+  <div id="bniScreen" style="display:none">
+    <div class="error-msg" id="bniErrorMsg"></div>
+
+    <div class="card-label" style="margin: 0 4px 10px">Your chapters</div>
+    <div id="bniChapterList"></div>
+    <button type="button" class="add-item-btn" onclick="loadBniChapters()" style="margin-top:12px;margin-bottom:24px">Refresh</button>
+
+    <div class="card">
+      <div class="card-label">Add / rescan a chapter</div>
+      <div class="field">
+        <label>Chapter name</label>
+        <input type="text" id="bniChapterName" placeholder="BNI Gatwick">
+      </div>
+      <div class="field">
+        <label>Member List page URL</label>
+        <input type="text" id="bniMemberListUrl" placeholder="https://bnisussex.com/gatwick-bni/en-GB/memberlist">
+      </div>
+      <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.5">Find this on the chapter's own site — the page literally titled "Member List". Only needed the first time; leave blank when rescanning a chapter already in the list above.</div>
+      <button class="generate-btn" id="bniScanBtn" onclick="scanBniChapter()" style="margin-top:14px">Scan chapter</button>
+    </div>
+  </div>
 </div>
 
 <div class="success" id="successScreen">
@@ -558,10 +582,13 @@
   function setTab(t) {
     document.getElementById('btnDraft').classList.toggle('active', t === 'draft');
     document.getElementById('btnConfirmed').classList.toggle('active', t === 'confirmed');
+    document.getElementById('btnBni').classList.toggle('active', t === 'bni');
     document.getElementById('draftScreen').style.display = (t === 'draft') ? 'block' : 'none';
     document.getElementById('confirmedScreen').style.display = (t === 'confirmed') ? 'block' : 'none';
+    document.getElementById('bniScreen').style.display = (t === 'bni') ? 'block' : 'none';
     if (t === 'draft') loadPendingInvoices();
     if (t === 'confirmed' && !coInvoiceNum) loadCoInvoiceNumber();
+    if (t === 'bni') loadBniChapters();
   }
 
   function escapeHtml_(s) {
@@ -1232,6 +1259,128 @@
     document.getElementById('coVariantRow').innerHTML = '';
     document.getElementById('coSuccessScreen').classList.remove('show');
     window.scrollTo(0, 0);
+  }
+
+  /* ═══════════════ BNI BADGES ═══════════════ */
+
+  function showBniError(msg) {
+    var el = document.getElementById('bniErrorMsg');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  function loadBniChapters() {
+    var list = document.getElementById('bniChapterList');
+    list.innerHTML = '<div style="font-size:14px;color:#888;padding:8px 0">Loading…</div>';
+    document.getElementById('bniErrorMsg').classList.remove('show');
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'bniListChapters', password: getPassword() })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') throw new Error(data.message || 'failed');
+        renderBniChapters(data.chapters || []);
+      })
+      .catch(function () {
+        list.innerHTML = '<div style="font-size:14px;color:#e53e3e;padding:8px 0">Could not load chapters.</div>';
+      });
+  }
+
+  function renderBniChapters(chapters) {
+    var list = document.getElementById('bniChapterList');
+    if (!chapters.length) {
+      list.innerHTML = '<div class="card" style="font-size:14px;color:#888">No chapters yet — add one below.</div>';
+      return;
+    }
+
+    list.innerHTML = '';
+    chapters.forEach(function (ch) {
+      var dateStr = '';
+      try { dateStr = new Date(ch.lastScraped).toLocaleDateString('en-GB'); } catch (e) {}
+
+      var row = document.createElement('div');
+      row.className = 'card';
+      row.innerHTML =
+        '<div style="font-weight:600;font-size:15px;margin-bottom:2px">' + escapeHtml_(ch.chapterName) + '</div>' +
+        '<div style="font-size:12px;color:#999;margin-bottom:12px">' + ch.memberCount + ' members · last scanned ' + (dateStr || 'never') + '</div>' +
+        '<div class="field"><label>Badge link to share with members</label><input type="text" readonly value="' + escapeHtml_(ch.badgeLink) + '" onclick="this.select()"></div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+          '<button type="button" class="add-item-btn rescan-btn" style="margin:0;flex:1">Rescan</button>' +
+          '<button type="button" class="add-item-btn copy-btn" style="margin:0;flex:1">Copy link</button>' +
+        '</div>';
+
+      row.querySelector('.rescan-btn').addEventListener('click', function () {
+        rescanBniChapter(ch.chapterName, this);
+      });
+      row.querySelector('.copy-btn').addEventListener('click', function () {
+        var btn = this;
+        navigator.clipboard.writeText(ch.badgeLink).then(function () {
+          var original = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(function () { btn.textContent = original; }, 1500);
+        });
+      });
+      list.appendChild(row);
+    });
+  }
+
+  function rescanBniChapter(chapterName, btn) {
+    btn.disabled = true;
+    var original = btn.textContent;
+    btn.textContent = 'Scanning…';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'bniAddOrRescanChapter', password: getPassword(), chapterName: chapterName })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') throw new Error(data.message || 'failed');
+        loadBniChapters();
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = original;
+        showBniError('Could not rescan ' + chapterName + ': ' + err.message);
+      });
+  }
+
+  function scanBniChapter() {
+    var nameEl = document.getElementById('bniChapterName');
+    var urlEl = document.getElementById('bniMemberListUrl');
+    var chapterName = nameEl.value.trim();
+    var memberListUrl = urlEl.value.trim();
+
+    document.getElementById('bniErrorMsg').classList.remove('show');
+    if (!chapterName) { showBniError('Please enter a chapter name.'); return; }
+
+    var btn = document.getElementById('bniScanBtn');
+    btn.disabled = true;
+    btn.textContent = 'Scanning…';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'bniAddOrRescanChapter', password: getPassword(), chapterName: chapterName, memberListUrl: memberListUrl })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = 'Scan chapter';
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') throw new Error(data.message || 'failed');
+        nameEl.value = '';
+        urlEl.value = '';
+        loadBniChapters();
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Scan chapter';
+        showBniError(err.message || 'Something went wrong — please check the URL and try again.');
+      });
   }
 
   addItemRow();

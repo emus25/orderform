@@ -111,7 +111,7 @@
 <div class="page">
   <div class="greeting">
     <h1>Get your digital name badge</h1>
-    <p>BNI Elmbridge &middot; fill in the details below and we'll build your badge</p>
+    <p id="chapterLine">BNI Elmbridge &middot; fill in the details below and we'll build your badge</p>
   </div>
 
   <div class="example-card">
@@ -173,7 +173,7 @@
 
   <div class="help-section">
     <p>Having trouble? Message Ediz now.</p>
-    <a class="wa-btn" href="https://wa.me/447754888841?text=Hi%20Ediz%2C%20I%27m%20having%20trouble%20with%20the%20BNI%20Elmbridge%20name%20badge%20form." target="_blank">Message on WhatsApp</a>
+    <a class="wa-btn" id="waBtn" href="https://wa.me/447754888841?text=Hi%20Ediz%2C%20I%27m%20having%20trouble%20with%20the%20BNI%20Elmbridge%20name%20badge%20form." target="_blank">Message on WhatsApp</a>
     <div class="help-email"><a href="mailto:ediz@exposureboost.com">ediz@exposureboost.com</a></div>
   </div>
 </div>
@@ -186,7 +186,22 @@
 
 <script>
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcMfHCK9FHp8RZXnJBDOQ-5vLheJT4g0vo7hC5-7wGyHYnbY2TpmXnC1qjLtBmTW92pA/exec';
-  var EVENT_NAME = 'BNI Elmbridge — 24 Jul 2026';
+
+  // No ?chapter= in the link at all -> exact current behaviour, byte-for-byte
+  // (today's already-shared Elmbridge link keeps working unchanged, same
+  // dated Drive folder it's already using). A ?chapter=X link is generic —
+  // used for any other chapter, with its own persistent (non-dated) folder.
+  var params = new URLSearchParams(window.location.search);
+  var chapterParam = params.get('chapter');
+  var CHAPTER_NAME = chapterParam || 'BNI Elmbridge';
+  var EVENT_NAME = chapterParam || 'BNI Elmbridge — 24 Jul 2026';
+
+  if (chapterParam) {
+    document.title = CHAPTER_NAME + ' — Digital Name Badges';
+    document.getElementById('chapterLine').textContent = CHAPTER_NAME + ' · fill in the details below and we\'ll build your badge';
+    document.getElementById('waBtn').href = 'https://wa.me/447754888841?text=' + encodeURIComponent('Hi Ediz, I\'m having trouble with the ' + CHAPTER_NAME + ' name badge form.');
+  }
+
   var MAX_FILE_BYTES = 8 * 1024 * 1024;
 
   var selectedFile = null;
@@ -277,6 +292,7 @@
       var payload = {
         action:       'bniBadgeUpload',
         eventName:    EVENT_NAME,
+        chapterName:  CHAPTER_NAME,
         name:         name,
         businessName: business,
         category:     category,
