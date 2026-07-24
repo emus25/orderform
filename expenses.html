@@ -98,9 +98,41 @@
   .success p { font-size: 14px; color: var(--text-muted); line-height: 1.6; white-space: pre-line; }
   .success .amount-logged { font-size: 13px; font-weight: 600; color: var(--accent); margin: 12px 0 28px; }
   .new-exp-btn { background: var(--bg); border: 1.5px solid var(--pill-border); color: var(--text); border-radius: 10px; padding: 13px 32px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  .lock-screen { min-height: 100dvh; width: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .lock-box { width: 100%; max-width: 320px; background: var(--surface); border-radius: 14px; border: 1px solid var(--border); padding: 24px; text-align: center; transition: background 0.2s, border-color 0.2s; }
+  .lock-title { font-size: 15px; font-weight: 600; color: var(--text-muted); margin-bottom: 14px; }
+  .lock-input {
+    width: 100%; font-family: 'Figtree', sans-serif; font-size: 15px; padding: 12px 14px;
+    border: 1.5px solid var(--pill-border); border-radius: 10px; background: var(--bg); color: var(--text);
+    margin-bottom: 10px; transition: border-color 0.15s; outline: none;
+  }
+  .lock-input:focus { border-color: var(--accent); }
+  .lock-error { display: none; font-size: 13px; color: #e53e3e; margin-bottom: 12px; }
+  .lock-error.show { display: block; }
+  .lock-submit-btn {
+    width: 100%; background: var(--submit-bg); color: var(--submit-fg); border: none; border-radius: 10px;
+    padding: 14px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s, background 0.2s, color 0.2s;
+  }
+  .lock-submit-btn:active { opacity: 0.8; }
+  .lock-submit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  #appRoot { display: flex; flex-direction: column; min-height: 100dvh; width: 100%; }
 </style>
 </head>
 <body>
+
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-box">
+    <div class="lock-title">Enter password</div>
+    <input type="password" id="lockPasswordInput" class="lock-input" autocomplete="current-password">
+    <div class="lock-error" id="lockError"></div>
+    <button type="button" class="lock-submit-btn" id="lockSubmitBtn" onclick="submitLockScreen()">Unlock</button>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none">
 
 <header>
   <img id="logoImg" src="https://emus25.github.io/orderform/logo.png" style="height:28px;width:auto;display:block;">
@@ -174,10 +206,73 @@
   <button class="new-exp-btn" onclick="resetForm()">Log another</button>
 </div>
 
+</div>
+
 <script>
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcMfHCK9FHp8RZXnJBDOQ-5vLheJT4g0vo7hC5-7wGyHYnbY2TpmXnC1qjLtBmTW92pA/exec';
   var MILEAGE_RATE = 0.45;
   var isPetrol = false;
+
+  // The password itself is never stored in this file — it's typed by the
+  // user, checked against a value only Apps Script's Script Properties
+  // knows, and cached in this browser's localStorage so it isn't re-typed
+  // every visit. Same mechanism as invoice-app.html.
+  var EB_PW_KEY = 'eb_dashboard_password';
+
+  function getPassword() { return localStorage.getItem(EB_PW_KEY) || ''; }
+
+  function verifyPassword(pw, onResult) {
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'checkDashboardPassword', password: pw })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) { onResult(data.status === 'success'); })
+      .catch(function () { onResult(false); });
+  }
+
+  function lockApp(msg) {
+    localStorage.removeItem(EB_PW_KEY);
+    document.getElementById('lockScreen').style.display = 'flex';
+    document.getElementById('appRoot').style.display = 'none';
+    var err = document.getElementById('lockError');
+    if (msg) { err.textContent = msg; err.classList.add('show'); } else { err.classList.remove('show'); }
+    document.getElementById('lockPasswordInput').value = '';
+  }
+
+  function unlockApp() {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('appRoot').style.display = 'flex';
+  }
+
+  function submitLockScreen() {
+    var pw = document.getElementById('lockPasswordInput').value;
+    var btn = document.getElementById('lockSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    verifyPassword(pw, function (ok) {
+      btn.disabled = false;
+      btn.textContent = 'Unlock';
+      if (ok) {
+        localStorage.setItem(EB_PW_KEY, pw);
+        unlockApp();
+      } else {
+        var err = document.getElementById('lockError');
+        err.textContent = 'Incorrect password.';
+        err.classList.add('show');
+      }
+    });
+  }
+
+  document.getElementById('lockPasswordInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') submitLockScreen();
+  });
+
+  (function () {
+    var pw = getPassword();
+    if (!pw) return;
+    verifyPassword(pw, function (ok) { if (ok) unlockApp(); else lockApp('Session expired — please re-enter the password.'); });
+  })();
 
   // Restore theme on load
   (function() {
@@ -288,6 +383,7 @@
 
     var payload = {
       action:      'logExpense',
+      password:    getPassword(),
       date:        dateStr,
       category:    category,
       description: description,
