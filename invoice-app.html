@@ -235,7 +235,7 @@
     <div class="card">
       <div class="card-label">Speak or type the order</div>
       <textarea class="quickline" id="quickline"></textarea>
-      <button type="button" class="parse-btn" onclick="parseQuickline()">Parse into fields below</button>
+      <button type="button" class="parse-btn" id="draftParseBtn" onclick="parseQuickline()">Parse into fields below</button>
     </div>
 
     <div class="error-msg" id="errorMsg"></div>
@@ -265,10 +265,7 @@
         <label>Custom payment link (optional)</label>
         <input type="text" id="fPayLink">
       </div>
-      <div class="checkbox-row">
-        <input type="checkbox" id="fIsPaid">
-        <label for="fIsPaid">Mark as already paid</label>
-      </div>
+      <div style="font-size:12px;color:#999;margin-top:10px;line-height:1.5">Drafts are always sent as proformas. If they've already paid, use the Confirmed Order tab so the sale lands in your orders sheet.</div>
     </div>
 
     <button class="generate-btn" id="generateBtn" onclick="generateDoc()">Create Draft Invoice</button>
@@ -476,7 +473,9 @@
 
 <script>
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcMfHCK9FHp8RZXnJBDOQ-5vLheJT4g0vo7hC5-7wGyHYnbY2TpmXnC1qjLtBmTW92pA/exec';
-  var SHEET_TOKEN = 'asdfgmhmtmrymnnrbvrf24t62452523.';
+  // Auth is the dashboard password only — checked server-side against Script
+  // Properties. No shared token lives in this page; anything embedded here is
+  // readable by anyone via View Source, so nothing secret ever goes in this file.
 
   // The password itself is never stored in this file — it's typed by the
   // user, checked against a value only Apps Script's Script Properties
@@ -567,7 +566,7 @@
 
     fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'listPendingQuickInvoices', token: SHEET_TOKEN, password: getPassword() })
+      body: JSON.stringify({ action: 'listPendingQuickInvoices', password: getPassword() })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -693,7 +692,7 @@
     var text = document.getElementById('quickline').value.trim();
     if (!text) return;
 
-    var btn = document.querySelector('.parse-btn');
+    var btn = document.getElementById('draftParseBtn');
     var originalLabel = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Parsing…';
@@ -701,7 +700,7 @@
 
     fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'parseQuickInvoiceText', token: SHEET_TOKEN, text: text, password: getPassword() })
+      body: JSON.stringify({ action: 'parseQuickInvoiceText', text: text, password: getPassword() })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -820,14 +819,12 @@
 
     var payload = {
       action:    'createQuickInvoice',
-      token:     SHEET_TOKEN,
       password:  getPassword(),
       docType:   'invoice',
       company:   company,
       email:     document.getElementById('fEmail').value.trim(),
       items:     items,
-      payLink:   document.getElementById('fPayLink').value.trim(),
-      isPaid:    document.getElementById('fIsPaid').checked
+      payLink:   document.getElementById('fPayLink').value.trim()
     };
 
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
@@ -867,7 +864,6 @@
     document.getElementById('fCompany').value = '';
     document.getElementById('fEmail').value = '';
     document.getElementById('fPayLink').value = '';
-    document.getElementById('fIsPaid').checked = false;
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
     addItemRow();
@@ -904,7 +900,7 @@
 
     fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'parseConfirmedOrderText', token: SHEET_TOKEN, text: text, password: getPassword() })
+      body: JSON.stringify({ action: 'parseConfirmedOrderText', text: text, password: getPassword() })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -970,7 +966,7 @@
       }
     }, 8000);
 
-    script.src = SCRIPT_URL + '?action=getInvoiceNumber&callback=_ebInvCallback&t=' + Date.now();
+    script.src = SCRIPT_URL + '?action=getInvoiceNumber&callback=_ebInvCallback&pw=' + encodeURIComponent(getPassword()) + '&t=' + Date.now();
     document.body.appendChild(script);
   }
 
