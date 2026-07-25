@@ -638,7 +638,10 @@
       var row = document.createElement('div');
       row.className = 'item-row';
       row.innerHTML =
-        '<div style="font-weight:600;font-size:15px">' + escapeHtml_(inv.company) + '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">' +
+          '<button type="button" class="remove-item-btn delete-draft-btn" style="font-size:17px" title="Delete draft">&#128465;</button>' +
+          '<div style="font-weight:600;font-size:15px">' + escapeHtml_(inv.company) + '</div>' +
+        '</div>' +
         '<div style="font-size:12px;color:#999;margin:2px 0 6px">' + escapeHtml_(inv.ref) + (dateStr ? ' · ' + dateStr : '') + '</div>' +
         '<div style="font-size:13px;color:#555;margin-bottom:10px">' + escapeHtml_(inv.itemsStr) + '</div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
@@ -647,6 +650,9 @@
           '<button type="button" class="parse-btn mark-paid-btn" style="width:auto;margin:0;padding:10px 14px">Mark Paid</button>' +
         '</div>';
 
+      row.querySelector('.delete-draft-btn').addEventListener('click', function () {
+        deleteDraft(inv, this);
+      });
       row.querySelector('.edit-draft-btn').addEventListener('click', function () {
         startEditDraft(inv);
       });
@@ -655,6 +661,27 @@
       });
       list.appendChild(row);
     });
+  }
+
+  function deleteDraft(inv, btn) {
+    if (!confirm('Delete draft ' + inv.ref + ' (' + inv.company + ')? This can\'t be undone.')) return;
+
+    btn.disabled = true;
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'deleteQuickInvoice', password: getPassword(), ref: inv.ref })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') throw new Error(data.message || 'failed');
+        if (editingDraftRef === inv.ref) resetForm();
+        loadPendingInvoices();
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        showError('Could not delete ' + inv.ref + ': ' + err.message);
+      });
   }
 
   // Editing a pending draft reuses the same reference and row — no new
