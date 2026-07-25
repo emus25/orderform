@@ -233,6 +233,11 @@
 
   <!-- ══════════ DRAFT INVOICE ══════════ -->
   <div id="draftScreen">
+    <div class="convert-banner" id="editBanner" style="display:none">
+      <span id="editBannerText"></span>
+      <button type="button" class="convert-cancel-btn" onclick="cancelEditDraft()">Cancel</button>
+    </div>
+
     <div class="card">
       <div class="card-label">Speak or type the order</div>
       <textarea class="quickline" id="quickline"></textarea>
@@ -636,16 +641,53 @@
         '<div style="font-weight:600;font-size:15px">' + escapeHtml_(inv.company) + '</div>' +
         '<div style="font-size:12px;color:#999;margin:2px 0 6px">' + escapeHtml_(inv.ref) + (dateStr ? ' · ' + dateStr : '') + '</div>' +
         '<div style="font-size:13px;color:#555;margin-bottom:10px">' + escapeHtml_(inv.itemsStr) + '</div>' +
-        '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<span style="font-size:16px;font-weight:600">£' + parseFloat(inv.total || 0).toFixed(2) + '</span>' +
-          '<button type="button" class="parse-btn">Mark Paid</button>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+          '<span style="font-size:16px;font-weight:600;flex:1">£' + parseFloat(inv.total || 0).toFixed(2) + '</span>' +
+          '<button type="button" class="add-item-btn edit-draft-btn" style="width:auto;margin:0;padding:10px 14px">Edit</button>' +
+          '<button type="button" class="parse-btn mark-paid-btn" style="width:auto;margin:0;padding:10px 14px">Mark Paid</button>' +
         '</div>';
 
-      row.querySelector('button').addEventListener('click', function () {
+      row.querySelector('.edit-draft-btn').addEventListener('click', function () {
+        startEditDraft(inv);
+      });
+      row.querySelector('.mark-paid-btn').addEventListener('click', function () {
         startConvertDraft(inv);
       });
       list.appendChild(row);
     });
+  }
+
+  // Editing a pending draft reuses the same reference and row — no new
+  // draft is created, no duplicate PDFs floating around, just the mistake
+  // corrected in place.
+  var editingDraftRef = null;
+
+  function startEditDraft(inv) {
+    editingDraftRef = inv.ref;
+    document.getElementById('fCompany').value = inv.company || '';
+    document.getElementById('fEmail').value = inv.email || '';
+    document.getElementById('fPayLink').value = '';
+
+    document.getElementById('itemsContainer').innerHTML = '';
+    itemRowCount = 0;
+    var items = (inv.items && inv.items.length) ? inv.items : [{}];
+    items.forEach(function (it) {
+      addItemRow({ item: it.name || it.item || '', qty: it.qty || '', price: it.unit || it.unitPrice || '' });
+    });
+    updateTotal();
+
+    document.getElementById('generateBtn').textContent = 'Save Changes';
+
+    var banner = document.getElementById('editBanner');
+    banner.style.display = 'flex';
+    document.getElementById('editBannerText').textContent = 'Editing draft ' + inv.ref + ' (' + inv.company + ') — fix it below, then save.';
+
+    setTab('draft');
+    window.scrollTo(0, 0);
+  }
+
+  function cancelEditDraft() {
+    resetForm();
   }
 
   // "Mark Paid" doesn't collect payment details itself — it hands off to the
@@ -866,9 +908,10 @@
       return;
     }
 
+    var isEdit = !!editingDraftRef;
     var btn = document.getElementById('generateBtn');
     btn.disabled = true;
-    btn.textContent = 'Generating…';
+    btn.textContent = isEdit ? 'Saving…' : 'Generating…';
 
     var payload = {
       action:    'createQuickInvoice',
@@ -879,6 +922,7 @@
       items:     items,
       payLink:   document.getElementById('fPayLink').value.trim()
     };
+    if (isEdit) payload.ref = editingDraftRef;
 
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
@@ -886,7 +930,7 @@
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'failed');
 
-        document.getElementById('successTitle').textContent = 'Draft invoice created';
+        document.getElementById('successTitle').textContent = isEdit ? 'Draft invoice updated' : 'Draft invoice created';
         document.getElementById('successRef').textContent = data.reference;
 
         var blob = base64ToBlob(data.pdfBase64, 'application/pdf');
@@ -895,13 +939,15 @@
         dl.href = url;
         dl.download = 'Invoice ' + data.reference + '.pdf';
 
+        editingDraftRef = null;
+        document.getElementById('editBanner').style.display = 'none';
         document.getElementById('successScreen').classList.add('show');
         loadPendingInvoices();
       })
-      .catch(function () {
+      .catch(function (err) {
         btn.disabled = false;
-        btn.textContent = 'Create Draft Invoice';
-        showError('Something went wrong — please try again or message ediz@exposureboost.com');
+        btn.textContent = isEdit ? 'Save Changes' : 'Create Draft Invoice';
+        showError(err.message || 'Something went wrong — please try again or message ediz@exposureboost.com');
       });
   }
 
@@ -913,6 +959,8 @@
   }
 
   function resetForm() {
+    editingDraftRef = null;
+    document.getElementById('editBanner').style.display = 'none';
     document.getElementById('quickline').value = '';
     document.getElementById('fCompany').value = '';
     document.getElementById('fEmail').value = '';
