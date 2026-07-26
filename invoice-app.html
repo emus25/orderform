@@ -274,7 +274,7 @@
 
       <button type="button" class="add-item-btn" onclick="addItemRow()">+ Add another item</button>
 
-      <div class="total-preview">
+      <div class="total-preview" id="totalPreviewCard">
         <span>Total</span>
         <span id="totalPreview">£0.00</span>
       </div>
@@ -543,6 +543,11 @@
     document.getElementById('btnModePaid').classList.toggle('active', m === 'paid');
 
     document.getElementById('payLinkCard').style.display = (m === 'draft') ? 'block' : 'none';
+    // Draft's plain "Total" preview and Paid's richer "Order total" (with
+    // the Lopay fee line) are two different displays of the same figure —
+    // only one should ever be visible, or they can show conflicting stale
+    // numbers when calcTotal() only updates whichever one is active.
+    document.getElementById('totalPreviewCard').style.display = (m === 'draft') ? 'flex' : 'none';
     document.getElementById('pendingCard').style.display = (m === 'draft') ? 'block' : 'none';
 
     document.querySelectorAll('.paid-only').forEach(function (el) { el.style.display = (m === 'paid') ? 'block' : 'none'; });
@@ -646,6 +651,21 @@
     row.querySelector('.fItem').focus();
   }
 
+  // Splits "Product – suffix" or "Product - suffix" into its base name and
+  // suffix — recognises both a plain hyphen (" - ", typed variant suffixes)
+  // and an en dash (" – ", e.g. the BNI Draft Invoice button's "Digital
+  // Member Name Badges – BNI A380") as the separator, since both are 3
+  // characters so the same +3 offset works for either. Shared by every place
+  // that needs to match a typed/stored item name against the catalog.
+  function splitCatalogSuffix_(raw) {
+    var sepMatch = raw.match(/ [-–] /);
+    var sep = sepMatch ? sepMatch.index : -1;
+    return {
+      baseName: (sep === -1 ? raw : raw.slice(0, sep)).trim(),
+      suffix: sep === -1 ? '' : raw.slice(sep + 3).trim()
+    };
+  }
+
   // If the typed description (before any " - Variant" suffix) matches a real
   // catalog product, silently attach its cost to the row (for profit
   // tracking) and offer its variants as quick-pick pills. Genuinely custom
@@ -657,14 +677,9 @@
     var priceEl = row.querySelector('.fPrice');
     var wrap = row.querySelector('.item-variant-pills');
     var raw = itemEl.value.trim();
-    // Recognises both a plain hyphen (" - ", typed variant suffixes) and an
-    // en dash (" – ", e.g. the BNI Draft Invoice button's "Digital Member
-    // Name Badges – BNI A380") as a "product + suffix" separator — both are
-    // 3 characters, so the same +3 offset works for either.
-    var sepMatch = raw.match(/ [-–] /);
-    var sep = sepMatch ? sepMatch.index : -1;
-    var baseName = (sep === -1 ? raw : raw.slice(0, sep)).trim();
-    var activeSuffix = sep === -1 ? '' : raw.slice(sep + 3).trim();
+    var split = splitCatalogSuffix_(raw);
+    var baseName = split.baseName;
+    var activeSuffix = split.suffix;
     var data = CATALOG_LOOKUP[baseName.toLowerCase()];
 
     wrap.innerHTML = '';
@@ -916,7 +931,10 @@
     var unmatched = [];
     (inv.items || []).forEach(function (it) {
       var name = it.name || it.item || '';
-      if (CATALOG_LOOKUP[name.toLowerCase()]) {
+      // Match on the base name (before any " - "/" – " suffix) — a plain
+      // full-string lookup would miss e.g. "Digital Member Name Badges –
+      // BNI A380", since the chapter name is never itself a catalog key.
+      if (name && CATALOG_LOOKUP[splitCatalogSuffix_(name).baseName.toLowerCase()]) {
         addItemRow({ item: name, qty: it.qty || 1, price: it.unit || it.unitPrice || '' });
       } else if (name) {
         unmatched.push(name + (it.qty ? ' x' + it.qty : ''));
