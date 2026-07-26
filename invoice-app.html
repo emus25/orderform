@@ -25,6 +25,7 @@
     font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; color: #888; cursor: pointer;
   }
   .toggle button.active { background: #1a1a1a; color: #fff; }
+  .mode-toggle { margin-bottom: 16px; }
 
   .card { background: #fff; border-radius: 14px; border: 1px solid #e8e8e5; padding: 16px; margin-bottom: 16px; }
   .card-label { font-size: 12px; font-weight: 600; color: #999; letter-spacing: 0.3px; margin-bottom: 10px; text-transform: uppercase; }
@@ -63,6 +64,21 @@
     padding: 12px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
   }
   .add-item-btn:active { opacity: 0.8; }
+
+  .item-variant-pills { display: none; gap: 6px; flex-wrap: wrap; margin: -4px 0 12px; }
+  .variant-pill-btn {
+    padding: 5px 12px; border-radius: 20px; border: 1.5px solid #e0e0dd; background: #fff;
+    font-family: 'Figtree', sans-serif; font-size: 13px; font-weight: 500; color: #888; cursor: pointer;
+    transition: all 0.12s; user-select: none;
+  }
+  .variant-pill-btn.active { border-color: #22a06b; color: #22a06b; background: #f0faf5; }
+
+  .item-row-summary {
+    display: none; align-items: center; justify-content: space-between; gap: 10px;
+    cursor: pointer; padding: 2px 0;
+  }
+  .item-row-summary-name { font-size: 14px; font-weight: 500; color: #1a1a1a; }
+  .item-row-summary-meta { font-size: 13px; color: #888; flex-shrink: 0; }
 
   @keyframes shake {
     10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); }
@@ -113,13 +129,18 @@
     padding: 14px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
     text-decoration: none; display: block; margin-bottom: 12px;
   }
+  .success .send-email-btn {
+    width: 100%; max-width: 280px; background: #22a06b; color: #fff; border: none; border-radius: 10px;
+    padding: 14px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
+    display: none; margin-bottom: 12px;
+  }
   .success .new-btn {
     width: 100%; max-width: 280px; background: transparent; color: #555; border: 1px solid #e0e0dd; border-radius: 10px;
     padding: 14px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
   }
 
-  /* ── Confirmed Order tab — ported from the real order form so product
-     names/prices and customer fields stay identical to the source of truth. */
+  /* ── Paid-mode fields — ported from the old Confirmed Order form so
+     customer/payment fields stay identical to the source of truth. */
   .co-badge { font-size: 12px; color: #888; background: #f0f0ee; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 16px; }
 
   .convert-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #1d4ed8; line-height: 1.4; }
@@ -129,33 +150,14 @@
   .co-group-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #aaa; padding: 12px 16px 4px; }
   .co-field { padding: 10px 16px; border-bottom: 1px solid #f0f0ee; }
   .co-field:last-child { border-bottom: none; }
-  #confirmedScreen label { display: block; font-size: 12px; font-weight: 500; color: #888; margin-bottom: 4px; }
-  #confirmedScreen input, #confirmedScreen select, #confirmedScreen textarea {
+  .paid-only label { display: block; font-size: 12px; font-weight: 500; color: #888; margin-bottom: 4px; }
+  .paid-only input, .paid-only select, .paid-only textarea {
     width: 100%; border: none; outline: none;
     font-family: 'Figtree', sans-serif; font-size: 15px;
     color: #1a1a1a; background: transparent; padding: 0; -webkit-appearance: none;
   }
-  #confirmedScreen input::placeholder, #confirmedScreen textarea::placeholder { color: #ccc; }
-  #confirmedScreen textarea { resize: none; min-height: 56px; line-height: 1.5; }
-  #confirmedScreen select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23bbb'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 0 center; padding-right: 16px; cursor: pointer;
-  }
-
-  .co-product-builder { padding: 12px 16px; border-bottom: 1px solid #f0f0ee; }
-  .co-builder-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; flex-wrap: wrap; }
-  .co-builder-row .col { flex: 1; min-width: 0; }
-  .co-builder-row .col-sm { flex: 0 0 72px; }
-
-  .co-builder-select {
-    width: 100%; border: 1.5px solid #e8e8e5; border-radius: 8px; outline: none;
-    font-family: 'Figtree', sans-serif; font-size: 14px; color: #1a1a1a;
-    background: #fafafa; padding: 9px 32px 9px 10px; -webkit-appearance: none; cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23bbb'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 10px center;
-    transition: border-color 0.15s;
-  }
-  .co-builder-select:focus { border-color: #22a06b; }
+  .paid-only input::placeholder, .paid-only textarea::placeholder { color: #ccc; }
+  .paid-only textarea { resize: none; min-height: 56px; line-height: 1.5; }
 
   .co-builder-input {
     width: 100%; border: 1.5px solid #e8e8e5; border-radius: 8px; outline: none;
@@ -164,49 +166,32 @@
   }
   .co-builder-input:focus { border-color: #22a06b; }
   .co-builder-input::placeholder { color: #ccc; }
-  .co-builder-label { font-size: 12px; color: #888; margin-bottom: 5px; display: block; }
-
-  .co-variant-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-  .co-var-radio { display: none; }
-  .co-var-pill {
-    padding: 5px 12px; border-radius: 20px; border: 1.5px solid #e0e0dd;
-    font-size: 13px; font-weight: 500; color: #888; cursor: pointer;
-    transition: all 0.12s; user-select: none;
-  }
-  .co-var-radio:checked + .co-var-pill { border-color: #22a06b; color: #22a06b; background: #f0faf5; }
-  .co-variant-label { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 6px; }
-
-  .co-add-btn {
-    width: 100%; background: #f5f5f3; border: 1.5px dashed #d0d0ce; border-radius: 8px;
-    padding: 10px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 500;
-    color: #22a06b; cursor: pointer; transition: background 0.12s;
-  }
-  .co-add-btn:active { background: #eaf7f2; }
-
-  .co-basket-label { padding: 0 4px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #aaa; }
-  .co-basket { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
-  .co-basket-item {
-    background: #fff; border: 1px solid #e8e8e5; border-radius: 10px;
-    padding: 12px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
-  }
-  .co-basket-item-info { flex: 1; min-width: 0; }
-  .co-basket-item-name { font-size: 14px; font-weight: 500; color: #1a1a1a; margin-bottom: 2px; line-height: 1.3; }
-  .co-basket-item-meta { font-size: 12px; color: #888; }
-  .co-basket-item-right { text-align: right; flex-shrink: 0; }
-  .co-basket-item-price { font-size: 14px; font-weight: 600; color: #1a1a1a; }
-  .co-remove-btn { background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 0; line-height: 1; margin-top: 2px; display: block; }
-  .co-remove-btn:active { color: #e53e3e; }
-  .co-empty-basket { font-size: 13px; color: #bbb; text-align: center; padding: 8px 0 4px; }
 
   .co-pay-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .co-pay-radio { display: none; }
   .co-pay-pill { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #e0e0dd; font-size: 13px; font-weight: 500; color: #888; cursor: pointer; transition: all 0.12s; user-select: none; }
   .co-pay-radio:checked + .co-pay-pill { border-color: #22a06b; color: #22a06b; background: #f0faf5; }
+  .deposit-link { font-size: 12px; color: #999; text-decoration: underline; display: inline-block; margin-top: 8px; cursor: pointer; }
 
   .co-totals { background: #fff; border-radius: 12px; border: 1px solid #e8e8e5; padding: 14px 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
   .co-total-label { font-size: 13px; color: #888; }
   .co-total-val { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
   .co-fee-line { font-size: 11px; color: #f59e0b; margin-top: 2px; }
+
+  /* ── Pending (Awaiting payment) list — compact, roughly half the height
+     of a regular item-row so the list doesn't need endless scrolling. */
+  .pending-item { border-top: 1px solid #f0f0ee; padding: 8px 2px; }
+  .pending-item:first-child { border-top: none; }
+  .pending-item-top { display: flex; align-items: center; gap: 8px; }
+  .pending-del-btn { background: none; border: none; font-size: 13px; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+  .pending-item-name { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pending-item-total { font-weight: 600; font-size: 14px; flex-shrink: 0; }
+  .pending-item-meta { font-size: 11px; color: #999; margin: 2px 0 6px 21px; }
+  .pending-item-actions { display: flex; gap: 6px; margin-left: 21px; }
+  .pending-mini-btn {
+    flex: 0 0 auto; background: #f0f0ee; border: none; border-radius: 8px; padding: 6px 10px;
+    font-family: 'Figtree', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -226,22 +211,34 @@
 
 <div class="page" id="appRoot" style="display:none">
   <div class="toggle" id="tabToggle">
-    <button type="button" id="btnDraft" class="active" onclick="setTab('draft')">Draft</button>
-    <button type="button" id="btnConfirmed" onclick="setTab('confirmed')">Confirmed</button>
+    <button type="button" id="btnInvoice" class="active" onclick="setTab('invoice')">Invoice</button>
     <button type="button" id="btnBni" onclick="setTab('bni')">BNI Badges</button>
   </div>
 
-  <!-- ══════════ DRAFT INVOICE ══════════ -->
-  <div id="draftScreen">
+  <!-- ══════════ INVOICE (Draft / Paid) ══════════ -->
+  <div id="invoiceScreen">
+    <div class="toggle mode-toggle" id="modeToggle">
+      <button type="button" id="btnModeDraft" class="active" onclick="setMode('draft')">Draft</button>
+      <button type="button" id="btnModePaid" onclick="setMode('paid')">Paid</button>
+    </div>
+
+    <span class="co-badge" id="confirmedInvBadge" style="display:none">Next invoice: …</span>
+
     <div class="convert-banner" id="editBanner" style="display:none">
       <span id="editBannerText"></span>
       <button type="button" class="convert-cancel-btn" onclick="cancelEditDraft()">Cancel</button>
     </div>
+    <div class="convert-banner" id="convertBanner" style="display:none">
+      <span id="convertBannerText"></span>
+      <button type="button" class="convert-cancel-btn" onclick="cancelConvertDraft()">Cancel</button>
+    </div>
 
+    <!-- Dictation — one shared box for both modes; the button dispatches to
+         the right parser based on which mode is currently active. -->
     <div class="card">
       <div class="card-label">Speak or type the order</div>
       <textarea class="quickline" id="quickline"></textarea>
-      <button type="button" class="parse-btn" id="draftParseBtn" onclick="parseQuickline()">Parse into fields below</button>
+      <button type="button" class="parse-btn" id="parseBtn" onclick="handleParse()">Parse into fields below</button>
     </div>
 
     <div class="error-msg" id="errorMsg"></div>
@@ -252,8 +249,24 @@
         <input type="text" id="fCompany">
       </div>
       <div class="field">
-        <label>Email (optional)</label>
+        <label>Email <span id="emailOptionalTag">(optional)</span></label>
         <input type="text" id="fEmail">
+      </div>
+
+      <!-- Paid-only customer fields -->
+      <div class="paid-only" id="paidCustomerFields" style="display:none">
+        <div class="field">
+          <label>Contact name</label>
+          <input type="text" id="coContact" placeholder="Sarah Ahmed" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>WhatsApp / phone</label>
+          <input type="tel" id="coPhone" placeholder="+44 7700 000000" inputmode="tel">
+        </div>
+        <div class="field">
+          <label>Delivery address</label>
+          <textarea id="coAddress" placeholder="123 High St, London, E1 1AA" style="width:100%;font-family:'Figtree',sans-serif;font-size:15px;padding:12px 14px;border:1px solid #e0e0dd;border-radius:10px;resize:none;min-height:56px"></textarea>
+        </div>
       </div>
 
       <div id="itemsContainer"></div>
@@ -267,168 +280,46 @@
       </div>
     </div>
 
-    <div class="card">
+    <!-- Draft-only payment link -->
+    <div class="card" id="payLinkCard">
       <div class="field">
         <label>Custom payment link (optional)</label>
         <input type="text" id="fPayLink">
       </div>
-      <div style="font-size:12px;color:#999;margin-top:10px;line-height:1.5">Drafts are always sent as proformas. If they've already paid, use the Confirmed Order tab so the sale lands in your orders sheet.</div>
+      <div style="font-size:12px;color:#999;margin-top:10px;line-height:1.5">Drafts are always sent as proformas — no real invoice number yet. Switch to "Paid" above once money's actually landed.</div>
     </div>
 
-    <button class="generate-btn" id="generateBtn" onclick="generateDoc()">Create Draft Invoice</button>
-
-    <div class="card" style="margin-top: 24px">
-      <div class="card-label">Awaiting payment</div>
-      <div id="pendingList"></div>
-      <button type="button" class="add-item-btn" onclick="loadPendingInvoices()">Refresh</button>
-    </div>
-  </div>
-
-  <!-- ══════════ CONFIRMED ORDER (mirrors the real order form) ══════════ -->
-  <div id="confirmedScreen" style="display:none">
-    <span class="co-badge" id="confirmedInvBadge">Next invoice: …</span>
-
-    <div class="convert-banner" id="convertBanner" style="display:none">
-      <span id="convertBannerText"></span>
-      <button type="button" class="convert-cancel-btn" onclick="cancelConvertDraft()">Cancel</button>
-    </div>
-
-    <div class="card">
-      <div class="card-label">Speak or type the order</div>
-      <textarea class="quickline" id="coQuickline"></textarea>
-      <button type="button" class="parse-btn" id="coParseBtn" onclick="parseCoQuickline()">Parse into fields below</button>
-    </div>
-
-    <div class="error-msg" id="coErrorMsg"></div>
-
-    <div class="co-group">
-      <div class="co-group-label">Customer</div>
-      <div class="co-field"><label>Company name</label><input type="text" id="coCompany" placeholder="Ace Jewellers" autocomplete="off"></div>
-      <div class="co-field"><label>Contact name</label><input type="text" id="coContact" placeholder="Sarah Ahmed" autocomplete="off"></div>
-      <div class="co-field"><label>Email</label><input type="email" id="coEmail" placeholder="sarah@acejewellers.co.uk" inputmode="email"></div>
-      <div class="co-field"><label>WhatsApp / phone</label><input type="tel" id="coPhone" placeholder="+44 7700 000000" inputmode="tel"></div>
-      <div class="co-field"><label>Delivery address</label><textarea id="coAddress" placeholder="123 High St, London, E1 1AA"></textarea></div>
-    </div>
-
-    <div class="co-basket-label">Order items</div>
-    <div class="co-basket" id="coBasket">
-      <div class="co-empty-basket" id="coEmptyMsg">No items yet — add a product below</div>
-    </div>
-
-    <div class="co-group">
-      <div class="co-group-label">Add product</div>
-      <div class="co-product-builder">
-
-        <div class="co-builder-row">
-          <div class="col">
-            <label class="co-builder-label">Product</label>
-            <select class="co-builder-select" id="coProduct" onchange="onCoProductChange()">
-              <option value="">Select…</option>
-
-              <optgroup label="Brushed Metal Cards — £99">
-                <option value="Gold Brushed Metal Card"       data-variants="Printed,Engraved"         data-price="99" data-cost="36.53">Gold Brushed Metal Card</option>
-                <option value="Silver Brushed Metal Card"     data-variants="Printed,Engraved"         data-price="99" data-cost="36.53">Silver Brushed Metal Card</option>
-                <option value="Rose Gold Brushed Metal Card"  data-variants="Printed,Engraved"         data-price="99" data-cost="36.53">Rose Gold Brushed Metal Card</option>
-                <option value="White Brushed Metal Card"      data-variants="Printed,Custom Colour"    data-price="99" data-cost="36.53">White Brushed Metal Card</option>
-                <option value="Black Brushed Metal Card"      data-variants="Printed,Custom Colour"    data-price="99" data-cost="36.53">Black Brushed Metal Card</option>
-              </optgroup>
-
-              <optgroup label="Coated Metal Cards — £99">
-                <option value="Black Coated Metal Card"   data-variants="Printed,Engraved / Silver,Engraved / Gold,Engraved / Rose Gold"  data-price="99" data-cost="30.44">Black Coated Metal Card</option>
-                <option value="Blue Coated Metal Card"    data-variants="Printed,Engraved / Silver,Engraved / Gold"                       data-price="99" data-cost="30.44">Blue Coated Metal Card</option>
-                <option value="Green Coated Metal Card"   data-variants="Printed,Engraved / Silver,Engraved / Gold"                       data-price="99" data-cost="30.44">Green Coated Metal Card</option>
-                <option value="Purple Coated Metal Card"  data-variants="Printed,Engraved / Silver,Engraved / Gold"                       data-price="99" data-cost="30.44">Purple Coated Metal Card</option>
-                <option value="White Coated Metal Card"   data-variants="Printed,Engraved / Silver,Engraved / Gold"                       data-price="99" data-cost="30.44">White Coated Metal Card</option>
-                <option value="Red Coated Metal Card"     data-variants="Printed"                                                         data-price="99" data-cost="30.44">Red Coated Metal Card</option>
-              </optgroup>
-
-              <optgroup label="Wood Cards — £70">
-                <option value="Bamboo Wood Card"       data-variants="Printed,Engraved" data-price="70" data-cost="13.85">Bamboo</option>
-                <option value="Black Bamboo Wood Card" data-variants="Printed,Engraved" data-price="70" data-cost="13.85">Black Bamboo</option>
-                <option value="Cherry Wood Card"       data-variants="Printed,Engraved" data-price="70" data-cost="13.85">Cherry</option>
-                <option value="Walnut Wood Card"       data-variants="Printed,Engraved" data-price="70" data-cost="13.85">Walnut</option>
-                <option value="Sapele Wood Card"       data-variants="Printed,Engraved" data-price="70" data-cost="13.85">Sapele</option>
-                <option value="Oak Wood Card"          data-variants="Printed,Engraved" data-price="70" data-cost="13.85">Oak</option>
-                <option value="Maple Wood Card"        data-variants="Printed,Engraved" data-price="70" data-cost="13.85">Maple</option>
-              </optgroup>
-
-              <optgroup label="Plastic Cards — £70">
-                <option value="White Plastic Card"   data-variants="Matte,Spot Gloss" data-price="70" data-cost="12.82">White (Custom Colour)</option>
-                <option value="Black Plastic Card"   data-variants="Matte,Spot Gloss" data-price="70" data-cost="12.82">Black</option>
-                <option value="Blue Plastic Card"    data-variants="Matte,Spot Gloss" data-price="70" data-cost="12.82">Blue</option>
-                <option value="Purple Plastic Card"  data-variants="Matte,Spot Gloss" data-price="70" data-cost="12.82">Purple</option>
-                <option value="Red Plastic Card"     data-variants="Matte,Spot Gloss" data-price="70" data-cost="12.82">Red</option>
-                <option value="Green Plastic Card"   data-variants="Matte,Spot Gloss" data-price="70" data-cost="12.82">Green</option>
-                <option value="Pink Plastic Card"    data-variants="Matte,Spot Gloss" data-price="70" data-cost="12.82">Pink</option>
-                <option value="Orange Plastic Card"  data-variants="Matte,Spot Gloss" data-price="70" data-cost="12.82">Orange</option>
-              </optgroup>
-
-              <optgroup label="Table Talker">
-                <option value="Black Table Talker" data-variants="Large — £99,Small — £89" data-price="99" data-cost="20.00">Black Table Talker</option>
-                <option value="White Table Talker" data-variants="Large — £99,Small — £89" data-price="99" data-cost="20.00">White Table Talker</option>
-              </optgroup>
-
-              <optgroup label="Keyrings — £60 for 3">
-                <option value="Keyring" data-variants="Regular,Slanted" data-price="60" data-cost="12.82">Keyring (x3)</option>
-              </optgroup>
-
-            </select>
-          </div>
-        </div>
-
-        <div id="coVariantSection" style="display:none; margin-bottom:10px;">
-          <div class="co-variant-label" id="coVariantLabel">Finish</div>
-          <div class="co-variant-row" id="coVariantRow"></div>
-        </div>
-
-        <div class="co-builder-row">
-          <div class="col-sm">
-            <label class="co-builder-label">Qty</label>
-            <input class="co-builder-input" type="number" id="coQty" value="1" min="1" inputmode="numeric">
-          </div>
-          <div class="col">
-            <label class="co-builder-label">Your price (£)</label>
-            <input class="co-builder-input" type="number" id="coPrice" placeholder="99.00" step="0.01" min="0" inputmode="decimal">
-          </div>
-        </div>
-
-        <button type="button" class="co-add-btn" onclick="addCoItem()">+ Add to order</button>
-      </div>
-    </div>
-
-    <div class="co-group">
+    <!-- Paid-only payment/fulfilment/notes -->
+    <div class="co-group paid-only" id="paidPaymentFields" style="display:none">
       <div class="co-group-label">Payment</div>
       <div class="co-field">
         <div class="co-pay-row">
-          <input class="co-pay-radio" type="radio" name="coPay" id="coPm1" value="Monzo transfer" onchange="calcCoTotal()">
+          <input class="co-pay-radio" type="radio" name="coPay" id="coPm1" value="Monzo transfer">
           <label class="co-pay-pill" for="coPm1">Monzo</label>
-          <input class="co-pay-radio" type="radio" name="coPay" id="coPm2" value="Lopay card" onchange="calcCoTotal()">
+          <input class="co-pay-radio" type="radio" name="coPay" id="coPm2" value="Lopay card" onchange="calcTotal()">
           <label class="co-pay-pill" for="coPm2">Lopay</label>
-          <input class="co-pay-radio" type="radio" name="coPay" id="coPm3" value="Cash" onchange="calcCoTotal()">
+          <input class="co-pay-radio" type="radio" name="coPay" id="coPm3" value="Cash">
           <label class="co-pay-pill" for="coPm3">Cash</label>
+          <input class="co-pay-radio" type="radio" name="coPay" id="coPm4" value="Stripe">
+          <label class="co-pay-pill" for="coPm4">Stripe</label>
         </div>
       </div>
       <div class="co-field">
         <label>Payment status</label>
-        <div class="co-pay-row" style="margin-bottom:0;">
-          <input class="co-pay-radio" type="radio" name="coPaystatus" id="coPs1" value="Paid in full" onchange="onCoPayStatus('full')">
-          <label class="co-pay-pill" for="coPs1">Paid in full</label>
-          <input class="co-pay-radio" type="radio" name="coPaystatus" id="coPs2" value="Partial deposit" onchange="onCoPayStatus('partial')">
-          <label class="co-pay-pill" for="coPs2">Partial deposit</label>
-          <input class="co-pay-radio" type="radio" name="coPaystatus" id="coPs3" value="Not yet paid" onchange="onCoPayStatus('none')">
-          <label class="co-pay-pill" for="coPs3">Not yet paid</label>
-        </div>
+        <div style="font-size:14px;color:#555;padding:4px 0 2px">Paid in full</div>
+        <a href="#" class="deposit-link" id="coDepositLink" onclick="showDepositOption(event)">Received a deposit instead?</a>
         <div id="coDepositWrap" style="display:none;margin-top:10px;">
           <input class="co-builder-input" type="number" id="coDeposit" placeholder="Deposit amount e.g. 50.00" step="0.01" min="0" inputmode="decimal">
+          <a href="#" class="deposit-link" id="coDepositCancelLink" onclick="hideDepositOption(event)" style="display:block;margin-top:6px">Actually, paid in full</a>
         </div>
       </div>
       <div class="co-field">
         <label>Fulfilment</label>
         <div class="co-pay-row">
-          <input class="co-pay-radio" type="radio" name="coFulfilment" id="coF1" value="Shipping">
-          <label class="co-pay-pill" for="coF1">Shipping</label>
-          <input class="co-pay-radio" type="radio" name="coFulfilment" id="coF2" value="Collection">
-          <label class="co-pay-pill" for="coF2">Collection</label>
+          <input class="co-pay-radio" type="radio" name="coFulfilment" id="coF1" value="Ship to customer">
+          <label class="co-pay-pill" for="coF1">Ship To Customer</label>
+          <input class="co-pay-radio" type="radio" name="coFulfilment" id="coF2" value="Deliver in person">
+          <label class="co-pay-pill" for="coF2">Deliver In Person</label>
         </div>
       </div>
       <div class="co-field">
@@ -449,7 +340,7 @@
       </div>
     </div>
 
-    <div class="co-totals">
+    <div class="co-totals paid-only" id="paidTotalsCard" style="display:none">
       <div>
         <div class="co-total-label">Order total</div>
         <div class="co-fee-line" id="coFeeLine" style="display:none;"></div>
@@ -457,7 +348,13 @@
       <div class="co-total-val" id="coTotalVal">£0.00</div>
     </div>
 
-    <button class="generate-btn" id="coSubmitBtn" onclick="handleCoSubmit()" disabled>Add items to submit</button>
+    <button class="generate-btn" id="generateBtn" onclick="handleSubmit()">Create Draft Invoice</button>
+
+    <div class="card" id="pendingCard" style="margin-top: 24px">
+      <div class="card-label">Awaiting payment</div>
+      <div id="pendingList"></div>
+      <button type="button" class="add-item-btn" onclick="loadPendingInvoices()">Refresh</button>
+    </div>
   </div>
 
   <!-- ══════════ BNI BADGES ══════════ -->
@@ -490,6 +387,7 @@
   <div class="ref" id="successRef"></div>
   <p>The PDF has also been emailed to you — grab it here or from your inbox to forward on.</p>
   <a class="download-btn" id="downloadBtn" href="#">Download PDF</a>
+  <button class="send-email-btn" id="sendEmailBtn" onclick="sendDraftEmail()">Send Email</button>
   <button class="new-btn" onclick="resetForm()">Create another</button>
 </div>
 
@@ -573,27 +471,97 @@
 
   var itemRowCount = 0;
 
-  // Read straight from the Confirmed Order dropdown's <option> values — the
-  // one place the real catalog is actually defined — so Draft Invoice's item
-  // field can offer the same names as autocomplete without a second copy of
-  // the list to keep in sync.
-  var CATALOG_NAMES = Array.prototype.map.call(
-    document.querySelectorAll('#coProduct option[value]:not([value=""])'),
-    function (opt) { return opt.value; }
-  );
+  // The real catalog: product name -> {price, cost, variants}. This used to
+  // live as hidden data-* attributes on a <select> in Confirmed Order — kept
+  // as one plain object now that item entry is free-text everywhere, so
+  // there's still exactly one place prices/costs are defined.
+  var CATALOG_DATA = {
+    "Gold Brushed Metal Card":       { price: 99, cost: 36.53, variants: ["Printed", "Engraved"] },
+    "Silver Brushed Metal Card":     { price: 99, cost: 36.53, variants: ["Printed", "Engraved"] },
+    "Rose Gold Brushed Metal Card":  { price: 99, cost: 36.53, variants: ["Printed", "Engraved"] },
+    "White Brushed Metal Card":      { price: 99, cost: 36.53, variants: ["Printed", "Custom Colour"] },
+    "Black Brushed Metal Card":      { price: 99, cost: 36.53, variants: ["Printed", "Custom Colour"] },
+
+    "Black Coated Metal Card":  { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold", "Engraved / Rose Gold"] },
+    "Blue Coated Metal Card":   { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
+    "Green Coated Metal Card":  { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
+    "Purple Coated Metal Card": { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
+    "White Coated Metal Card":  { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
+    "Red Coated Metal Card":    { price: 99, cost: 30.44, variants: ["Printed"] },
+
+    "Bamboo Wood Card":       { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
+    "Black Bamboo Wood Card": { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
+    "Cherry Wood Card":       { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
+    "Walnut Wood Card":       { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
+    "Sapele Wood Card":       { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
+    "Oak Wood Card":          { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
+    "Maple Wood Card":        { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
+
+    "White Plastic Card":  { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+    "Black Plastic Card":  { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+    "Blue Plastic Card":   { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+    "Purple Plastic Card": { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+    "Red Plastic Card":    { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+    "Green Plastic Card":  { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+    "Pink Plastic Card":   { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+    "Orange Plastic Card": { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+
+    "Black Table Talker": { price: 99, cost: 20.00, variants: [] },
+    "White Table Talker": { price: 99, cost: 20.00, variants: [] },
+
+    "Keyring": { price: 60, cost: 12.82, variants: ["Regular", "Slanted"] }
+  };
+
+  var CATALOG_NAMES = Object.keys(CATALOG_DATA);
+  var CATALOG_LOOKUP = {};
+  CATALOG_NAMES.forEach(function (n) { CATALOG_LOOKUP[n.toLowerCase()] = CATALOG_DATA[n]; });
+
   document.getElementById('catalogDatalist').innerHTML =
     CATALOG_NAMES.map(function (n) { return '<option value="' + n.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">'; }).join('');
 
   function setTab(t) {
-    document.getElementById('btnDraft').classList.toggle('active', t === 'draft');
-    document.getElementById('btnConfirmed').classList.toggle('active', t === 'confirmed');
+    document.getElementById('btnInvoice').classList.toggle('active', t === 'invoice');
     document.getElementById('btnBni').classList.toggle('active', t === 'bni');
-    document.getElementById('draftScreen').style.display = (t === 'draft') ? 'block' : 'none';
-    document.getElementById('confirmedScreen').style.display = (t === 'confirmed') ? 'block' : 'none';
+    document.getElementById('invoiceScreen').style.display = (t === 'invoice') ? 'block' : 'none';
     document.getElementById('bniScreen').style.display = (t === 'bni') ? 'block' : 'none';
-    if (t === 'draft') loadPendingInvoices();
-    if (t === 'confirmed' && !coInvoiceNum) loadCoInvoiceNumber();
     if (t === 'bni') loadBniChapters();
+  }
+
+  // Draft = quick quote/proforma, no real invoice number yet, nothing lands
+  // in the real ledger. Paid = a real order — real invoice number, real
+  // customer/payment fields, forwards to Tagify. Company/email and the item
+  // list are shared between both; only the extra paid-specific fields and
+  // the submit action change.
+  var invoiceMode = 'draft';
+
+  function setMode(m) {
+    invoiceMode = m;
+    document.getElementById('btnModeDraft').classList.toggle('active', m === 'draft');
+    document.getElementById('btnModePaid').classList.toggle('active', m === 'paid');
+
+    document.getElementById('payLinkCard').style.display = (m === 'draft') ? 'block' : 'none';
+    document.getElementById('pendingCard').style.display = (m === 'draft') ? 'block' : 'none';
+
+    document.querySelectorAll('.paid-only').forEach(function (el) { el.style.display = (m === 'paid') ? 'block' : 'none'; });
+    document.getElementById('confirmedInvBadge').style.display = (m === 'paid') ? 'inline-block' : 'none';
+    document.getElementById('emailOptionalTag').style.display = (m === 'paid') ? 'none' : 'inline';
+
+    if (m === 'draft') {
+      document.getElementById('generateBtn').textContent = editingDraftRef ? 'Save Changes' : 'Create Draft Invoice';
+      loadPendingInvoices();
+    } else {
+      document.getElementById('generateBtn').textContent = 'Submit order & send invoice →';
+      if (!coInvoiceNum) loadCoInvoiceNumber();
+      calcTotal();
+    }
+  }
+
+  function handleSubmit() {
+    if (invoiceMode === 'paid') { handlePaidSubmit(); } else { generateDoc(); }
+  }
+
+  function handleParse() {
+    if (invoiceMode === 'paid') { parseCoQuickline(); } else { parseQuickline(); }
   }
 
   function escapeHtml_(s) {
@@ -602,7 +570,202 @@
     });
   }
 
-  /* ═══════════════ DRAFT INVOICE ═══════════════ */
+  /* ═══════════════ SHARED ITEM ROWS (Draft + Paid) ═══════════════ */
+
+  function addItemRow(prefill) {
+    itemRowCount++;
+    var id = itemRowCount;
+    var container = document.getElementById('itemsContainer');
+    var row = document.createElement('div');
+    row.className = 'item-row';
+    row.dataset.rowId = id;
+    row.dataset.cost = '';
+    row.innerHTML =
+      '<div class="item-row-head"><span>Item</span>' +
+        '<button type="button" class="remove-item-btn" onclick="removeItemRow(' + id + ')">&times;</button></div>' +
+      '<div class="item-row-summary" style="display:none"></div>' +
+      '<div class="item-row-body">' +
+        '<div class="field"><label>Description</label><input type="text" class="fItem" list="catalogDatalist"></div>' +
+        '<div class="item-variant-pills"></div>' +
+        '<div class="row2">' +
+          '<div class="field"><label>Qty</label><input type="number" class="fQty" min="0" step="1"></div>' +
+          '<div class="field"><label>Unit price £</label><input type="number" class="fPrice" min="0" step="0.01"></div>' +
+        '</div>' +
+      '</div>';
+    container.appendChild(row);
+
+    row.querySelector('.fQty').addEventListener('input', calcTotal);
+    row.querySelector('.fPrice').addEventListener('input', calcTotal);
+    row.querySelector('.fQty').addEventListener('blur', function () { collapseItemRow(row); });
+    row.querySelector('.fPrice').addEventListener('blur', function () { collapseItemRow(row); });
+    row.querySelector('.fItem').addEventListener('blur', function () {
+      this.value = titleCase(this.value.trim());
+      checkItemVariants(row);
+      calcTotal();
+    });
+    row.querySelector('.item-row-summary').addEventListener('click', function () { expandItemRow(row); });
+
+    if (prefill) {
+      if (prefill.item) row.querySelector('.fItem').value = prefill.item;
+      if (prefill.qty) row.querySelector('.fQty').value = prefill.qty;
+      if (prefill.price) row.querySelector('.fPrice').value = prefill.price;
+      checkItemVariants(row);
+      calcTotal();
+      collapseItemRow(row);
+    }
+    renumberItemRows();
+    return row;
+  }
+
+  // Once an item's description, qty and price are all filled in, fold it
+  // down to a one-line summary so a multi-item order doesn't turn into
+  // endless scrolling — tap the summary to reopen and edit it.
+  function collapseItemRow(row) {
+    var itemEl = row.querySelector('.fItem');
+    var qtyEl = row.querySelector('.fQty');
+    var priceEl = row.querySelector('.fPrice');
+    var item = itemEl.value.trim();
+    var qty = parseFloat(qtyEl.value);
+    var price = parseFloat(priceEl.value);
+    if (!item || !qty || qty <= 0 || isNaN(price) || price < 0) return;
+
+    var summary = row.querySelector('.item-row-summary');
+    summary.innerHTML =
+      '<div class="item-row-summary-name">' + escapeHtml_(item) + '</div>' +
+      '<div class="item-row-summary-meta">Qty ' + qty + ' × £' + price.toFixed(2) + ' = £' + (qty * price).toFixed(2) + '</div>';
+    summary.style.display = 'flex';
+    row.querySelector('.item-row-body').style.display = 'none';
+  }
+
+  function expandItemRow(row) {
+    row.querySelector('.item-row-summary').style.display = 'none';
+    row.querySelector('.item-row-body').style.display = 'block';
+    row.querySelector('.fItem').focus();
+  }
+
+  // If the typed description (before any " - Variant" suffix) matches a real
+  // catalog product, silently attach its cost to the row (for profit
+  // tracking) and offer its variants as quick-pick pills. Genuinely custom
+  // text just doesn't match anything — cost stays 0, no pills, exactly like
+  // typing a custom item always worked.
+  function checkItemVariants(row) {
+    var itemEl = row.querySelector('.fItem');
+    var qtyEl = row.querySelector('.fQty');
+    var priceEl = row.querySelector('.fPrice');
+    var wrap = row.querySelector('.item-variant-pills');
+    var raw = itemEl.value.trim();
+    var sep = raw.indexOf(' - ');
+    var baseName = (sep === -1 ? raw : raw.slice(0, sep)).trim();
+    var activeSuffix = sep === -1 ? '' : raw.slice(sep + 3).trim();
+    var data = CATALOG_LOOKUP[baseName.toLowerCase()];
+
+    wrap.innerHTML = '';
+    if (!data) { wrap.style.display = 'none'; row.dataset.cost = ''; return; }
+
+    row.dataset.cost = data.cost;
+    if (!qtyEl.value) qtyEl.value = 1;
+    if (!priceEl.value) priceEl.value = data.price.toFixed(2);
+
+    if (!data.variants || !data.variants.length) { wrap.style.display = 'none'; return; }
+
+    wrap.style.display = 'flex';
+    data.variants.forEach(function (v) {
+      var m = v.match(/^(.*) — £([\d.]+)$/);
+      var label = m ? m[1] : v;
+      var overridePrice = m ? parseFloat(m[2]) : null;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'variant-pill-btn' + (label === activeSuffix ? ' active' : '');
+      btn.textContent = label;
+      btn.addEventListener('click', function () {
+        itemEl.value = baseName + ' - ' + label;
+        if (overridePrice != null) priceEl.value = overridePrice.toFixed(2);
+        wrap.querySelectorAll('.variant-pill-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        calcTotal();
+        collapseItemRow(row);
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function removeItemRow(id) {
+    var container = document.getElementById('itemsContainer');
+    if (container.children.length <= 1) return;
+    var row = container.querySelector('[data-row-id="' + id + '"]');
+    if (row) row.remove();
+    renumberItemRows();
+    calcTotal();
+  }
+
+  function renumberItemRows() {
+    var rows = document.getElementById('itemsContainer').children;
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].querySelector('.item-row-head span').textContent = 'Item ' + (i + 1);
+    }
+  }
+
+  function getItemRows() {
+    return Array.prototype.slice.call(document.getElementById('itemsContainer').children);
+  }
+
+  function buildBasketFromRows() {
+    return getItemRows().map(function (row) {
+      return {
+        name:  row.querySelector('.fItem').value.trim(),
+        qty:   parseFloat(row.querySelector('.fQty').value) || 0,
+        price: parseFloat(row.querySelector('.fPrice').value) || 0,
+        cost:  parseFloat(row.dataset.cost) || 0
+      };
+    });
+  }
+
+  // "city piling" -> "City Piling" — so lazily-typed/dictated names still
+  // look right on the PDF, without forcing case on things already capitalized.
+  function titleCase(s) {
+    return String(s || '').replace(/\w\S*/g, function (w) {
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    });
+  }
+
+  function calcTotal() {
+    var total = 0;
+    getItemRows().forEach(function (row) {
+      var qty = parseFloat(row.querySelector('.fQty').value) || 0;
+      var price = parseFloat(row.querySelector('.fPrice').value) || 0;
+      total += qty * price;
+    });
+
+    if (invoiceMode === 'paid') {
+      var pay = document.querySelector('input[name="coPay"]:checked');
+      var isLopay = pay && pay.value === 'Lopay card';
+      var fee = isLopay ? total * 0.0099 + 0.08 : 0;
+      var net = total - fee;
+      document.getElementById('coTotalVal').textContent = '£' + total.toFixed(2);
+      var feeLine = document.getElementById('coFeeLine');
+      if (isLopay && fee > 0) {
+        feeLine.textContent = 'Lopay fee −£' + fee.toFixed(2) + ' → you keep £' + net.toFixed(2);
+        feeLine.style.display = 'block';
+      } else {
+        feeLine.style.display = 'none';
+      }
+    } else {
+      document.getElementById('totalPreview').textContent = '£' + total.toFixed(2);
+    }
+  }
+
+  function showError(msg) {
+    var el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  function shakeField(el) {
+    el.classList.add('invalid', 'shake');
+    setTimeout(function () { el.classList.remove('shake'); }, 400);
+  }
+
+  /* ═══════════════ DRAFT SUBMIT ═══════════════ */
 
   function loadPendingInvoices() {
     var list = document.getElementById('pendingList');
@@ -636,21 +799,20 @@
       try { dateStr = new Date(inv.date).toLocaleDateString('en-GB'); } catch (e) {}
 
       var row = document.createElement('div');
-      row.className = 'item-row';
+      row.className = 'pending-item';
       row.innerHTML =
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">' +
-          '<button type="button" class="remove-item-btn delete-draft-btn" style="font-size:17px" title="Delete draft">&#128465;</button>' +
-          '<div style="font-weight:600;font-size:15px">' + escapeHtml_(inv.company) + '</div>' +
+        '<div class="pending-item-top">' +
+          '<button type="button" class="pending-del-btn" title="Delete draft">❌</button>' +
+          '<div class="pending-item-name">' + escapeHtml_(inv.company) + '</div>' +
+          '<div class="pending-item-total">£' + parseFloat(inv.total || 0).toFixed(2) + '</div>' +
         '</div>' +
-        '<div style="font-size:12px;color:#999;margin:2px 0 6px">' + escapeHtml_(inv.ref) + (dateStr ? ' · ' + dateStr : '') + '</div>' +
-        '<div style="font-size:13px;color:#555;margin-bottom:10px">' + escapeHtml_(inv.itemsStr) + '</div>' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
-          '<span style="font-size:16px;font-weight:600;flex:1">£' + parseFloat(inv.total || 0).toFixed(2) + '</span>' +
-          '<button type="button" class="add-item-btn edit-draft-btn" style="width:auto;margin:0;padding:10px 14px">Edit</button>' +
-          '<button type="button" class="parse-btn mark-paid-btn" style="width:auto;margin:0;padding:10px 14px">Mark Paid</button>' +
+        '<div class="pending-item-meta">' + escapeHtml_(inv.ref) + (dateStr ? ' · ' + dateStr : '') + '</div>' +
+        '<div class="pending-item-actions">' +
+          '<button type="button" class="pending-mini-btn edit-draft-btn">Edit</button>' +
+          '<button type="button" class="pending-mini-btn mark-paid-btn">Mark Paid</button>' +
         '</div>';
 
-      row.querySelector('.delete-draft-btn').addEventListener('click', function () {
+      row.querySelector('.pending-del-btn').addEventListener('click', function () {
         deleteDraft(inv, this);
       });
       row.querySelector('.edit-draft-btn').addEventListener('click', function () {
@@ -689,8 +851,16 @@
   // corrected in place.
   var editingDraftRef = null;
 
+  // Set when a draft is started from the "Draft Invoice" button on a BNI
+  // chapter card — tags the resulting Quick Invoice row with the chapter so
+  // the chapter card can later show a link to its PDF. Cleared once the
+  // draft is saved (or the form is reset/reused for anything else).
+  var pendingBniChapter = null;
+
   function startEditDraft(inv) {
+    pendingBniChapter = null;
     editingDraftRef = inv.ref;
+    setMode('draft');
     document.getElementById('fCompany').value = inv.company || '';
     document.getElementById('fEmail').value = inv.email || '';
     document.getElementById('fPayLink').value = '';
@@ -701,7 +871,7 @@
     items.forEach(function (it) {
       addItemRow({ item: it.name || it.item || '', qty: it.qty || '', price: it.unit || it.unitPrice || '' });
     });
-    updateTotal();
+    calcTotal();
 
     document.getElementById('generateBtn').textContent = 'Save Changes';
 
@@ -709,7 +879,7 @@
     banner.style.display = 'flex';
     document.getElementById('editBannerText').textContent = 'Editing draft ' + inv.ref + ' (' + inv.company + ') — fix it below, then save.';
 
-    setTab('draft');
+    setTab('invoice');
     window.scrollTo(0, 0);
   }
 
@@ -717,42 +887,36 @@
     resetForm();
   }
 
-  // "Mark Paid" doesn't collect payment details itself — it hands off to the
-  // Confirmed Order tab (real catalog, real customer fields, real payment
-  // method) pre-filled with what the draft already knows, so one submit both
-  // closes out the draft and logs a proper order.
+  // "Mark Paid" doesn't collect payment details itself — it switches this
+  // same page into Paid mode, pre-filled with what the draft already knows,
+  // so one submit both closes out the draft and logs a proper order.
   var convertingDraftRef = null;
 
   function startConvertDraft(inv) {
     convertingDraftRef = inv.ref;
-    document.getElementById('coCompany').value = inv.company || '';
-    document.getElementById('coEmail').value = inv.email || '';
-    document.getElementById('coPs1').checked = true; // "Paid in full" — this is a paid draft being closed out
+    setMode('paid');
+    document.getElementById('fCompany').value = inv.company || '';
+    document.getElementById('fEmail').value = inv.email || '';
+    hideDepositOption(); // "Paid in full" — this is a paid draft being closed out
 
     // Draft items that are already exact catalog names (thanks to catalog
-    // matching at dictation time) get added to the basket automatically —
-    // no re-selecting. Only genuinely custom items need a hand: they're
-    // dropped into the dictation box so one tap of Parse handles the rest.
-    coBasket = [];
-    var sel = document.getElementById('coProduct');
+    // matching at dictation time) carry straight over. Only genuinely custom
+    // items need a hand: they're dropped into the dictation box so one tap
+    // of Parse handles the rest.
+    document.getElementById('itemsContainer').innerHTML = '';
+    itemRowCount = 0;
     var unmatched = [];
     (inv.items || []).forEach(function (it) {
       var name = it.name || it.item || '';
-      var matched = false;
-      for (var i = 0; i < sel.options.length; i++) {
-        if (sel.options[i].value === name) { matched = true; break; }
-      }
-      if (matched) {
-        sel.value = name;
-        onCoProductChange();
-        document.getElementById('coQty').value = it.qty || 1;
-        addCoItem();
+      if (CATALOG_LOOKUP[name.toLowerCase()]) {
+        addItemRow({ item: name, qty: it.qty || 1, price: it.unit || it.unitPrice || '' });
       } else if (name) {
         unmatched.push(name + (it.qty ? ' x' + it.qty : ''));
       }
     });
-    renderCoBasket();
-    document.getElementById('coQuickline').value = unmatched.join(', ');
+    if (!getItemRows().length) addItemRow();
+    calcTotal();
+    document.getElementById('quickline').value = unmatched.join(', ');
 
     var banner = document.getElementById('convertBanner');
     banner.style.display = 'flex';
@@ -760,7 +924,7 @@
       ? 'Closing out draft ' + inv.ref + ' (' + inv.company + ') — ' + unmatched.length + ' item(s) need matching below.'
       : 'Closing out draft ' + inv.ref + ' (' + inv.company + ') — items already matched, just confirm and submit.';
 
-    setTab('confirmed');
+    setTab('invoice');
     window.scrollTo(0, 0);
   }
 
@@ -769,63 +933,37 @@
     document.getElementById('convertBanner').style.display = 'none';
   }
 
-  function addItemRow(prefill) {
-    itemRowCount++;
-    var id = itemRowCount;
-    var container = document.getElementById('itemsContainer');
-    var row = document.createElement('div');
-    row.className = 'item-row';
-    row.dataset.rowId = id;
-    row.innerHTML =
-      '<div class="item-row-head"><span>Item</span>' +
-        '<button type="button" class="remove-item-btn" onclick="removeItemRow(' + id + ')">&times;</button></div>' +
-      '<div class="field"><label>Description</label><input type="text" class="fItem" list="catalogDatalist"></div>' +
-      '<div class="row2">' +
-        '<div class="field"><label>Qty</label><input type="number" class="fQty" min="0" step="1"></div>' +
-        '<div class="field"><label>Unit price £</label><input type="number" class="fPrice" min="0" step="0.01"></div>' +
-      '</div>';
-    container.appendChild(row);
+  // "Draft Invoice" button on a BNI chapter card — jumps to Draft mode with
+  // company/item/qty/price already filled in from the chapter's own data
+  // (£10/badge, one per member). Nothing is submitted yet — it's just a
+  // starting point the same as any other draft, fully editable before
+  // "Create Draft Invoice" is pressed.
+  function startBniDraftInvoice(chapterName, memberCount) {
+    editingDraftRef = null;
+    pendingBniChapter = chapterName;
+    setMode('draft');
+    document.getElementById('editBanner').style.display = 'none';
+    document.getElementById('fCompany').value = chapterName;
+    document.getElementById('fEmail').value = '';
+    document.getElementById('fPayLink').value = '';
 
-    row.querySelector('.fQty').addEventListener('input', updateTotal);
-    row.querySelector('.fPrice').addEventListener('input', updateTotal);
-    row.querySelector('.fItem').addEventListener('blur', function () {
-      this.value = titleCase(this.value.trim());
-    });
+    document.getElementById('itemsContainer').innerHTML = '';
+    itemRowCount = 0;
+    addItemRow({ item: 'Digital Member Name Badges – ' + chapterName, qty: memberCount, price: 10 });
+    calcTotal();
 
-    if (prefill) {
-      if (prefill.item) row.querySelector('.fItem').value = prefill.item;
-      if (prefill.qty) row.querySelector('.fQty').value = prefill.qty;
-      if (prefill.price) row.querySelector('.fPrice').value = prefill.price;
-    }
-    renumberItemRows();
-    return row;
-  }
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('generateBtn').textContent = 'Create Draft Invoice';
 
-  function removeItemRow(id) {
-    var container = document.getElementById('itemsContainer');
-    if (container.children.length <= 1) return;
-    var row = container.querySelector('[data-row-id="' + id + '"]');
-    if (row) row.remove();
-    renumberItemRows();
-    updateTotal();
-  }
-
-  function renumberItemRows() {
-    var rows = document.getElementById('itemsContainer').children;
-    for (var i = 0; i < rows.length; i++) {
-      rows[i].querySelector('.item-row-head span').textContent = 'Item ' + (i + 1);
-    }
-  }
-
-  function getItemRows() {
-    return Array.prototype.slice.call(document.getElementById('itemsContainer').children);
+    setTab('invoice');
+    window.scrollTo(0, 0);
   }
 
   function parseQuickline() {
     var text = document.getElementById('quickline').value.trim();
     if (!text) return;
 
-    var btn = document.getElementById('draftParseBtn');
+    var btn = document.getElementById('parseBtn');
     var originalLabel = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Parsing…';
@@ -847,14 +985,10 @@
 
         document.getElementById('itemsContainer').innerHTML = '';
         itemRowCount = 0;
-        // The backend already matches spoken items against the real catalog
-        // (exact names, correct prices) — trust it as-is. Only genuinely
-        // custom items (no catalog match) come back as free text, which just
-        // needs title-casing to look right on the PDF.
         var items = (data.items && data.items.length) ? data.items : [{}];
         items.forEach(function (it) {
           var raw = it.item || '';
-          var isCatalogMatch = CATALOG_NAMES.indexOf(raw) !== -1;
+          var isCatalogMatch = !!CATALOG_LOOKUP[raw.toLowerCase()];
           addItemRow({
             item: isCatalogMatch ? raw : titleCase(raw),
             qty: it.qty || '',
@@ -862,42 +996,13 @@
           });
         });
 
-        updateTotal();
+        calcTotal();
       })
       .catch(function () {
         btn.disabled = false;
         btn.textContent = originalLabel;
         showError('Could not parse that — please fill in the fields below manually, or try rephrasing.');
       });
-  }
-
-  // "city piling" -> "City Piling" — so lazily-typed/dictated names still
-  // look right on the PDF, without forcing case on things already capitalized.
-  function titleCase(s) {
-    return String(s || '').replace(/\w\S*/g, function (w) {
-      return w.charAt(0).toUpperCase() + w.slice(1);
-    });
-  }
-
-  function updateTotal() {
-    var total = 0;
-    getItemRows().forEach(function (row) {
-      var qty = parseFloat(row.querySelector('.fQty').value) || 0;
-      var price = parseFloat(row.querySelector('.fPrice').value) || 0;
-      total += qty * price;
-    });
-    document.getElementById('totalPreview').textContent = '£' + total.toFixed(2);
-  }
-
-  function showError(msg) {
-    var el = document.getElementById('errorMsg');
-    el.textContent = msg;
-    el.classList.add('show');
-  }
-
-  function shakeField(el) {
-    el.classList.add('invalid', 'shake');
-    setTimeout(function () { el.classList.remove('shake'); }, 400);
   }
 
   function generateDoc() {
@@ -950,6 +1055,7 @@
       payLink:   document.getElementById('fPayLink').value.trim()
     };
     if (isEdit) payload.ref = editingDraftRef;
+    if (pendingBniChapter) payload.bniChapter = pendingBniChapter;
 
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
@@ -966,7 +1072,18 @@
         dl.href = url;
         dl.download = 'Invoice ' + data.reference + '.pdf';
 
+        lastCreatedRef = data.reference;
+        var emailBtn = document.getElementById('sendEmailBtn');
+        if (payload.email) {
+          emailBtn.style.display = 'block';
+          emailBtn.disabled = false;
+          emailBtn.textContent = 'Send Email';
+        } else {
+          emailBtn.style.display = 'none';
+        }
+
         editingDraftRef = null;
+        pendingBniChapter = null;
         document.getElementById('editBanner').style.display = 'none';
         document.getElementById('successScreen').classList.add('show');
         loadPendingInvoices();
@@ -975,6 +1092,34 @@
         btn.disabled = false;
         btn.textContent = isEdit ? 'Save Changes' : 'Create Draft Invoice';
         showError(err.message || 'Something went wrong — please try again or message ediz@exposureboost.com');
+      });
+  }
+
+  // Set at the moment a draft's created/saved successfully — lets the
+  // success screen's "Send Email" button know which row to email without
+  // asking the customer's email address twice.
+  var lastCreatedRef = null;
+
+  function sendDraftEmail() {
+    if (!lastCreatedRef) return;
+    var btn = document.getElementById('sendEmailBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'sendQuickInvoiceEmail', password: getPassword(), ref: lastCreatedRef })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') throw new Error(data.message || 'failed');
+        btn.textContent = 'Sent ✓';
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Send Email';
+        showError('Could not send: ' + (err.message || 'unknown error'));
       });
   }
 
@@ -987,6 +1132,8 @@
 
   function resetForm() {
     editingDraftRef = null;
+    pendingBniChapter = null;
+    lastCreatedRef = null;
     document.getElementById('editBanner').style.display = 'none';
     document.getElementById('quickline').value = '';
     document.getElementById('fCompany').value = '';
@@ -995,9 +1142,10 @@
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
     addItemRow();
-    updateTotal();
+    calcTotal();
     document.getElementById('generateBtn').disabled = false;
     document.getElementById('generateBtn').textContent = 'Create Draft Invoice';
+    document.getElementById('sendEmailBtn').style.display = 'none';
     document.getElementById('successScreen').classList.remove('show');
   }
 
@@ -1005,73 +1153,9 @@
     this.value = titleCase(this.value.trim());
   });
 
-  /* ═══════════════ CONFIRMED ORDER ═══════════════ */
+  /* ═══════════════ PAID SUBMIT ═══════════════ */
 
-  var coBasket = [];
   var coInvoiceNum = null;
-
-  function showCoError(msg) {
-    var el = document.getElementById('coErrorMsg');
-    el.textContent = msg;
-    el.classList.add('show');
-  }
-
-  function parseCoQuickline() {
-    var text = document.getElementById('coQuickline').value.trim();
-    if (!text) return;
-
-    var btn = document.getElementById('coParseBtn');
-    var originalLabel = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Parsing…';
-    document.getElementById('coErrorMsg').classList.remove('show');
-
-    fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'parseConfirmedOrderText', text: text, password: getPassword() })
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
-        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
-        if (data.status !== 'success') throw new Error(data.message || 'parse failed');
-
-        if (data.company) document.getElementById('coCompany').value = data.company;
-        if (data.contact) document.getElementById('coContact').value = data.contact;
-        if (data.email) document.getElementById('coEmail').value = data.email;
-        if (data.phone) document.getElementById('coPhone').value = data.phone;
-        if (data.address) document.getElementById('coAddress').value = data.address;
-
-        var sel = document.getElementById('coProduct');
-        (data.items || []).forEach(function (it) {
-          var matched = false;
-          for (var i = 0; i < sel.options.length; i++) {
-            if (sel.options[i].value === it.product) { matched = true; break; }
-          }
-          if (!matched) return;
-
-          sel.value = it.product;
-          onCoProductChange();
-          document.getElementById('coQty').value = it.qty || 1;
-          addCoItem();
-        });
-
-        if (!(data.items || []).length) {
-          showCoError('Got the customer details, but no items matched the catalog — add products below manually.');
-        }
-      })
-      .catch(function () {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
-        showCoError('Could not parse that — please fill in the fields below manually, or try rephrasing.');
-      });
-  }
-
-  var CO_SIZE_PRICE_MAP = {
-    'Large — £99': 99,
-    'Small — £89': 89
-  };
 
   function loadCoInvoiceNumber() {
     var badge = document.getElementById('confirmedInvBadge');
@@ -1098,179 +1182,109 @@
     document.body.appendChild(script);
   }
 
-  function onCoProductChange() {
-    var sel = document.getElementById('coProduct');
-    var opt = sel.options[sel.selectedIndex];
-    if (!opt.value) { document.getElementById('coVariantSection').style.display = 'none'; return; }
+  // Paid mode implies "Paid in full" by default — no visible status choice
+  // needed. This link is the one, deliberately buried, way to record a
+  // deposit instead for the rare case that isn't a full payment.
+  var isDepositMode = false;
 
-    var variants = opt.dataset.variants ? opt.dataset.variants.split(',') : [];
-    var defaultPrice = parseFloat(opt.dataset.price) || 0;
-
-    document.getElementById('coPrice').value = defaultPrice > 0 ? defaultPrice.toFixed(2) : '';
-
-    var section  = document.getElementById('coVariantSection');
-    var row      = document.getElementById('coVariantRow');
-    var varLabel = document.getElementById('coVariantLabel');
-    row.innerHTML = '';
-
-    if (variants.length === 0 || (variants.length === 1 && variants[0].trim() === '')) {
-      section.style.display = 'none';
-      return;
-    }
-
-    if (variants.some(function (v) { return v.includes('Engrav'); })) {
-      varLabel.textContent = 'Finish';
-    } else if (variants.some(function (v) { return v.includes('£'); })) {
-      varLabel.textContent = 'Size';
-    } else if (variants.some(function (v) { return v === 'Matte' || v === 'Spot Gloss'; })) {
-      varLabel.textContent = 'Finish';
-    } else if (variants.some(function (v) { return v === 'Regular' || v === 'Slanted'; })) {
-      varLabel.textContent = 'Style';
-    } else {
-      varLabel.textContent = 'Option';
-    }
-
-    variants.forEach(function (v, i) {
-      v = v.trim();
-      var id = 'coVar_' + i;
-      row.innerHTML += '<input class="co-var-radio" type="radio" name="coVariant" id="' + id + '" value="' + v + '"' + (i === 0 ? ' checked' : '') + ' onchange="onCoVariantChange()">' +
-                       '<label class="co-var-pill" for="' + id + '">' + v + '</label>';
-    });
-
-    section.style.display = 'block';
-    onCoVariantChange();
+  function showDepositOption(e) {
+    if (e) e.preventDefault();
+    isDepositMode = true;
+    document.getElementById('coDepositWrap').style.display = 'block';
+    document.getElementById('coDepositLink').style.display = 'none';
+    document.getElementById('coDeposit').focus();
   }
 
-  function onCoVariantChange() {
-    var checked = document.querySelector('input[name="coVariant"]:checked');
-    if (!checked) return;
-    var val = checked.value;
-    if (CO_SIZE_PRICE_MAP[val] !== undefined) {
-      document.getElementById('coPrice').value = CO_SIZE_PRICE_MAP[val].toFixed(2);
-    }
-  }
-
-  function addCoItem() {
-    var sel = document.getElementById('coProduct');
-    var opt = sel.options[sel.selectedIndex];
-    if (!opt.value) { showCoError('Please select a product first.'); return; }
-
-    var product   = opt.value;
-    var cost      = parseFloat(opt.dataset.cost) || 0;
-    var variantEl = document.querySelector('input[name="coVariant"]:checked');
-    var variant   = variantEl ? variantEl.value : '';
-    var qty       = parseInt(document.getElementById('coQty').value) || 1;
-    var price     = parseFloat(document.getElementById('coPrice').value);
-    if (!price || price <= 0) { showCoError('Please enter a selling price.'); return; }
-
-    var variantDisplay = variant.replace(/ — £\d+/, '').trim();
-    var name = product + (variantDisplay ? ' — ' + variantDisplay : '');
-
-    coBasket.push({ name: name, qty: qty, price: price, cost: cost });
-    renderCoBasket();
-
-    document.getElementById('coProduct').value = '';
-    document.getElementById('coQty').value = '1';
-    document.getElementById('coPrice').value = '';
-    document.getElementById('coVariantSection').style.display = 'none';
-    document.getElementById('coVariantRow').innerHTML = '';
-  }
-
-  function renderCoBasket() {
-    var container = document.getElementById('coBasket');
-
-    if (coBasket.length === 0) {
-      container.innerHTML = '<div class="co-empty-basket" id="coEmptyMsg">No items yet — add a product below</div>';
-      document.getElementById('coSubmitBtn').disabled = true;
-      document.getElementById('coSubmitBtn').textContent = 'Add items to submit';
-      calcCoTotal();
-      return;
-    }
-
-    container.innerHTML = coBasket.map(function (item, i) {
-      var lineTotal = (item.qty * item.price).toFixed(2);
-      return '<div class="co-basket-item">' +
-        '<div class="co-basket-item-info">' +
-          '<div class="co-basket-item-name">' + escapeHtml_(item.name) + '</div>' +
-          '<div class="co-basket-item-meta">Qty ' + item.qty + ' &times; £' + item.price.toFixed(2) + '</div>' +
-        '</div>' +
-        '<div class="co-basket-item-right">' +
-          '<div class="co-basket-item-price">£' + lineTotal + '</div>' +
-          '<button type="button" class="co-remove-btn" onclick="removeCoItem(' + i + ')">×</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-
-    document.getElementById('coSubmitBtn').disabled = false;
-    document.getElementById('coSubmitBtn').textContent = 'Submit order & send invoice →';
-    calcCoTotal();
-  }
-
-  function removeCoItem(i) {
-    coBasket.splice(i, 1);
-    renderCoBasket();
-  }
-
-  function calcCoTotal() {
-    var total   = coBasket.reduce(function (sum, item) { return sum + item.qty * item.price; }, 0);
-    var pay     = document.querySelector('input[name="coPay"]:checked');
-    var isLopay = pay && pay.value === 'Lopay card';
-    var fee     = isLopay ? total * 0.0099 + 0.08 : 0;
-    var net     = total - fee;
-
-    document.getElementById('coTotalVal').textContent = '£' + total.toFixed(2);
-    var feeLine = document.getElementById('coFeeLine');
-    if (isLopay && fee > 0) {
-      feeLine.textContent = 'Lopay fee −£' + fee.toFixed(2) + ' → you keep £' + net.toFixed(2);
-      feeLine.style.display = 'block';
-    } else {
-      feeLine.style.display = 'none';
-    }
-  }
-
-  function onCoPayStatus(type) {
-    var wrap = document.getElementById('coDepositWrap');
-    if (type === 'partial') {
-      wrap.style.display = 'block';
-      document.getElementById('coDeposit').focus();
-    } else {
-      wrap.style.display = 'none';
-      document.getElementById('coDeposit').value = '';
-    }
+  function hideDepositOption(e) {
+    if (e) e.preventDefault();
+    isDepositMode = false;
+    document.getElementById('coDepositWrap').style.display = 'none';
+    document.getElementById('coDeposit').value = '';
+    document.getElementById('coDepositLink').style.display = 'inline-block';
   }
 
   function onCoSourceType(val) {
     var input = document.getElementById('coSource');
-    if (val) {
-      input.value = val + ' — ';
-    } else {
-      input.value = '';
-    }
+    input.value = val || '';
     input.focus();
   }
 
-  function handleCoSubmit() {
-    if (coBasket.length === 0) { showCoError('Please add at least one product.'); return; }
+  function parseCoQuickline() {
+    var text = document.getElementById('quickline').value.trim();
+    if (!text) return;
+
+    var btn = document.getElementById('parseBtn');
+    var originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Parsing…';
+    document.getElementById('errorMsg').classList.remove('show');
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'parseConfirmedOrderText', text: text, password: getPassword() })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') throw new Error(data.message || 'parse failed');
+
+        if (data.company) document.getElementById('fCompany').value = data.company;
+        if (data.contact) document.getElementById('coContact').value = data.contact;
+        if (data.email) document.getElementById('fEmail').value = data.email;
+        if (data.phone) document.getElementById('coPhone').value = data.phone;
+        if (data.address) document.getElementById('coAddress').value = data.address;
+
+        var matchedAny = false;
+        (data.items || []).forEach(function (it) {
+          var product = it.product || '';
+          if (!CATALOG_LOOKUP[product.toLowerCase()]) return;
+          matchedAny = true;
+          addItemRow({ item: product, qty: it.qty || 1 });
+        });
+
+        calcTotal();
+        if (!matchedAny) {
+          showError('Got the customer details, but no items matched the catalog — add products below manually.');
+        }
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        showError('Could not parse that — please fill in the fields below manually, or try rephrasing.');
+      });
+  }
+
+  function handlePaidSubmit() {
+    document.getElementById('errorMsg').classList.remove('show');
+    var basket = buildBasketFromRows().filter(function (i) { return i.name; });
+
+    if (!basket.length) { showError('Please add at least one item.'); return; }
+    for (var bi = 0; bi < basket.length; bi++) {
+      if (!basket[bi].qty || basket[bi].qty <= 0 || isNaN(basket[bi].price) || basket[bi].price < 0) {
+        showError('Please check every item has a quantity and a price.');
+        return;
+      }
+    }
 
     var payEl = document.querySelector('input[name="coPay"]:checked');
-    if (!payEl) { showCoError('Please select a payment method.'); return; }
+    if (!payEl) { showError('Please select a payment method.'); return; }
 
     var fulfilEl = document.querySelector('input[name="coFulfilment"]:checked');
-    if (!fulfilEl) { showCoError('Please select shipping or collection.'); return; }
+    if (!fulfilEl) { showError('Please select shipping or collection.'); return; }
 
-    var company = document.getElementById('coCompany').value.trim();
+    var company = document.getElementById('fCompany').value.trim();
     var contact = document.getElementById('coContact').value.trim();
-    var email   = document.getElementById('coEmail').value.trim();
-    if (!company || !contact || !email) { showCoError('Please fill in company, contact name and email.'); return; }
+    var email   = document.getElementById('fEmail').value.trim();
+    if (!company || !contact || !email) { showError('Please fill in company, contact name and email.'); return; }
 
-    var btn = document.getElementById('coSubmitBtn');
+    var btn = document.getElementById('generateBtn');
     btn.disabled = true;
     btn.textContent = 'Sending…';
 
-    var payStatusEl = document.querySelector('input[name="coPaystatus"]:checked');
     var dep = document.getElementById('coDeposit').value;
-    var payStatus = payStatusEl ? payStatusEl.value : '';
-    if (payStatus === 'Partial deposit' && dep) payStatus = 'Partial deposit — £' + parseFloat(dep).toFixed(2);
+    var payStatus = (isDepositMode && dep) ? ('Partial deposit — £' + parseFloat(dep).toFixed(2)) : 'Paid in full';
 
     var payload = {
       password:      getPassword(),
@@ -1279,7 +1293,7 @@
       email:         email,
       phone:         document.getElementById('coPhone').value.trim(),
       address:       document.getElementById('coAddress').value.trim(),
-      basket:        coBasket,
+      basket:        basket,
       paymentMethod: payEl.value,
       paymentStatus: payStatus,
       fulfilment:    fulfilEl.value,
@@ -1288,8 +1302,8 @@
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
 
-    var total   = coBasket.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
-    var summary = coBasket.map(function (i) { return i.name + ' x' + i.qty; }).join('\n');
+    var total   = basket.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
+    var summary = basket.map(function (i) { return i.name + ' x' + i.qty; }).join('\n');
     var invoiceNumAtSubmit = coInvoiceNum;
 
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
@@ -1304,34 +1318,36 @@
 
         convertingDraftRef = null;
         document.getElementById('convertBanner').style.display = 'none';
-        loadPendingInvoices();
 
         coInvoiceNum = null;
         document.getElementById('confirmedInvBadge').textContent = 'Next invoice: …';
         loadCoInvoiceNumber();
       })
-      .catch(function () {
+      .catch(function (err) {
         btn.disabled = false;
         btn.textContent = 'Submit order & send invoice →';
-        showCoError('Something went wrong — please try again or message ediz@exposureboost.com');
+        showError(err.message || 'Something went wrong — please try again or message ediz@exposureboost.com');
       });
   }
 
   function resetCoForm() {
-    document.getElementById('coQuickline').value = '';
-    document.getElementById('coCompany').value = '';
+    document.getElementById('quickline').value = '';
+    document.getElementById('fCompany').value = '';
+    document.getElementById('fEmail').value = '';
     document.getElementById('coContact').value = '';
-    document.getElementById('coEmail').value = '';
     document.getElementById('coPhone').value = '';
     document.getElementById('coAddress').value = '';
     document.getElementById('coSource').value = '';
     document.getElementById('coNotes').value = '';
     document.getElementById('coDeposit').value = '';
-    document.querySelectorAll('input[name="coPay"], input[name="coPaystatus"], input[name="coFulfilment"], input[name="coSourceType"]').forEach(function (r) { r.checked = false; });
-    coBasket = [];
-    renderCoBasket();
-    document.getElementById('coVariantSection').style.display = 'none';
-    document.getElementById('coVariantRow').innerHTML = '';
+    document.querySelectorAll('input[name="coPay"], input[name="coFulfilment"], input[name="coSourceType"]').forEach(function (r) { r.checked = false; });
+    hideDepositOption();
+    document.getElementById('itemsContainer').innerHTML = '';
+    itemRowCount = 0;
+    addItemRow();
+    calcTotal();
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('generateBtn').textContent = 'Submit order & send invoice →';
     document.getElementById('coSuccessScreen').classList.remove('show');
     window.scrollTo(0, 0);
   }
@@ -1379,13 +1395,19 @@
       var row = document.createElement('div');
       row.className = 'card';
       row.innerHTML =
-        '<div style="font-weight:600;font-size:15px;margin-bottom:2px">' + escapeHtml_(ch.chapterName) + '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px">' +
+          '<div style="font-weight:600;font-size:15px">' + escapeHtml_(ch.chapterName) + '</div>' +
+          (ch.lastInvoicePdfLink
+            ? '<a href="' + escapeHtml_(ch.lastInvoicePdfLink) + '" target="_blank" rel="noopener" style="flex-shrink:0;font-size:12px;font-weight:600;color:#1a6ee0;text-decoration:none">PDF</a>'
+            : '') +
+        '</div>' +
         '<div style="font-size:12px;color:#999;margin-bottom:12px">' + ch.memberCount + ' members · last scanned ' + (dateStr || 'never') + '</div>' +
         '<div class="field"><label>Badge link to share with members</label><input type="text" readonly value="' + escapeHtml_(ch.badgeLink) + '" onclick="this.select()"></div>' +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
           '<button type="button" class="add-item-btn rescan-btn" style="margin:0;flex:1">Rescan</button>' +
           '<button type="button" class="add-item-btn copy-btn" style="margin:0;flex:1">Copy link</button>' +
-        '</div>';
+        '</div>' +
+        '<button type="button" class="generate-btn draft-invoice-btn" style="margin-top:8px">Draft Invoice</button>';
 
       row.querySelector('.rescan-btn').addEventListener('click', function () {
         rescanBniChapter(ch.chapterName, this);
@@ -1397,6 +1419,9 @@
           btn.textContent = 'Copied!';
           setTimeout(function () { btn.textContent = original; }, 1500);
         });
+      });
+      row.querySelector('.draft-invoice-btn').addEventListener('click', function () {
+        startBniDraftInvoice(ch.chapterName, ch.memberCount);
       });
       list.appendChild(row);
     });
@@ -1459,12 +1484,13 @@
   }
 
   addItemRow();
+  loadPendingInvoices();
 
   // Lets a link/redirect (e.g. the old standalone order form's URL) land
-  // straight on Confirmed Order via ?tab=confirmed instead of the default.
+  // straight on Paid mode via ?tab=confirmed instead of the default Draft.
   (function () {
     var params = new URLSearchParams(window.location.search);
-    if (params.get('tab') === 'confirmed') setTab('confirmed');
+    if (params.get('tab') === 'confirmed') setMode('paid');
   })();
 </script>
 </body>
