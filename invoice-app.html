@@ -509,7 +509,10 @@
     "Black Table Talker": { price: 99, cost: 20.00, variants: [] },
     "White Table Talker": { price: 99, cost: 20.00, variants: [] },
 
-    "Keyring": { price: 60, cost: 12.82, variants: ["Regular", "Slanted"] }
+    "Keyring": { price: 60, cost: 12.82, variants: ["Regular", "Slanted"] },
+
+    "Digital Member Name Badges": { price: 10, cost: 5.40, variants: [] },
+    "£1/year Hosting Fee": { price: 1, cost: 0, variants: [] }
   };
 
   var CATALOG_NAMES = Object.keys(CATALOG_DATA);
@@ -654,7 +657,12 @@
     var priceEl = row.querySelector('.fPrice');
     var wrap = row.querySelector('.item-variant-pills');
     var raw = itemEl.value.trim();
-    var sep = raw.indexOf(' - ');
+    // Recognises both a plain hyphen (" - ", typed variant suffixes) and an
+    // en dash (" – ", e.g. the BNI Draft Invoice button's "Digital Member
+    // Name Badges – BNI A380") as a "product + suffix" separator — both are
+    // 3 characters, so the same +3 offset works for either.
+    var sepMatch = raw.match(/ [-–] /);
+    var sep = sepMatch ? sepMatch.index : -1;
     var baseName = (sep === -1 ? raw : raw.slice(0, sep)).trim();
     var activeSuffix = sep === -1 ? '' : raw.slice(sep + 3).trim();
     var data = CATALOG_LOOKUP[baseName.toLowerCase()];
@@ -934,10 +942,11 @@
   }
 
   // "Draft Invoice" button on a BNI chapter card — jumps to Draft mode with
-  // company/item/qty/price already filled in from the chapter's own data
-  // (£10/badge, one per member). Nothing is submitted yet — it's just a
-  // starting point the same as any other draft, fully editable before
-  // "Create Draft Invoice" is pressed.
+  // company/items/qty/price already filled in from the chapter's own data:
+  // £10/badge plus the first year's £1/badge hosting fee, one of each per
+  // member. Nothing is submitted yet — it's just a starting point the same
+  // as any other draft, fully editable before "Create Draft Invoice" is
+  // pressed.
   function startBniDraftInvoice(chapterName, memberCount) {
     editingDraftRef = null;
     pendingBniChapter = chapterName;
@@ -950,6 +959,7 @@
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
     addItemRow({ item: 'Digital Member Name Badges – ' + chapterName, qty: memberCount, price: 10 });
+    addItemRow({ item: '£1/year Hosting Fee', qty: memberCount, price: 1 });
     calcTotal();
 
     document.getElementById('generateBtn').disabled = false;
