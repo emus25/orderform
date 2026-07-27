@@ -917,6 +917,7 @@
 
   function startConvertDraft(inv) {
     convertingDraftRef = inv.ref;
+    currentOrderKey = null; // starting a distinct order → fresh key
     setMode('paid');
     document.getElementById('fCompany').value = inv.company || '';
     document.getElementById('fEmail').value = inv.email || '';
@@ -1185,6 +1186,15 @@
 
   var coInvoiceNum = null;
 
+  // Idempotency key for the order currently being submitted. Generated once,
+  // reused on every retry of the SAME order (so a timed-out submit tapped
+  // again is recognised server-side as the same order, not a new one), and
+  // cleared only on success so the next order gets a fresh key.
+  var currentOrderKey = null;
+  function newOrderKey_() {
+    return 'ord-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
   function loadCoInvoiceNumber() {
     var badge = document.getElementById('confirmedInvBadge');
     var script = document.createElement('script');
@@ -1314,6 +1324,10 @@
     var dep = document.getElementById('coDeposit').value;
     var payStatus = (isDepositMode && dep) ? ('Partial deposit — £' + parseFloat(dep).toFixed(2)) : 'Paid in full';
 
+    // Generate the key on the first attempt; a retry after a failed/timed-out
+    // send reuses the same one, so the server can tell it's the same order.
+    if (!currentOrderKey) currentOrderKey = newOrderKey_();
+
     var payload = {
       password:      getPassword(),
       company:       company,
@@ -1326,7 +1340,8 @@
       paymentStatus: payStatus,
       fulfilment:    fulfilEl.value,
       source:        document.getElementById('coSource').value.trim(),
-      notes:         document.getElementById('coNotes').value.trim()
+      notes:         document.getElementById('coNotes').value.trim(),
+      orderKey:      currentOrderKey
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
 
@@ -1345,6 +1360,7 @@
         document.getElementById('coSuccessScreen').classList.add('show');
 
         convertingDraftRef = null;
+        currentOrderKey = null; // order succeeded — next order starts a fresh key
         document.getElementById('convertBanner').style.display = 'none';
 
         coInvoiceNum = null;
@@ -1359,6 +1375,7 @@
   }
 
   function resetCoForm() {
+    currentOrderKey = null; // fresh order → fresh key
     document.getElementById('quickline').value = '';
     document.getElementById('fCompany').value = '';
     document.getElementById('fEmail').value = '';
