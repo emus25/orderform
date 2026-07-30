@@ -124,6 +124,9 @@
   .success h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.02em; }
   .success p { font-size: 14px; color: #888; line-height: 1.6; max-width: 320px; margin-bottom: 24px; white-space: pre-line; }
   .success .ref { font-size: 13px; color: #999; margin-bottom: 20px; }
+  .tagify-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 7px 16px; border-radius: 20px; margin-bottom: 18px; max-width: 300px; line-height: 1.4; }
+  .tagify-badge.good { background: #f0faf5; color: #1a7a4c; }
+  .tagify-badge.bad { background: #fdf1f1; color: #b3261e; }
   .success .download-btn {
     width: 100%; max-width: 280px; background: #1a1a1a; color: #fff; border: none; border-radius: 10px;
     padding: 14px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
@@ -350,6 +353,17 @@
 
     <button class="generate-btn" id="generateBtn" onclick="handleSubmit()">Create Draft Invoice</button>
 
+    <div class="card paid-only" id="retryTagifyCard" style="display:none; margin-top: 24px">
+      <div class="card-label">Retry Tagify Forward</div>
+      <div style="font-size:12px;color:#999;margin-bottom:10px;line-height:1.5">For an order already placed that didn't reach Tagify (e.g. no address at the time) — re-sends it using the order's current details, without creating a new order or invoice number.</div>
+      <div class="field">
+        <label>Invoice number</label>
+        <input type="text" id="retryInvoiceNum" placeholder="10156">
+      </div>
+      <button type="button" class="add-item-btn" onclick="retryTagifyForward()">Retry Tagify Forward</button>
+      <div id="retryTagifyResult" style="margin-top:10px"></div>
+    </div>
+
     <div class="card" id="pendingCard" style="margin-top: 24px">
       <div class="card-label">Awaiting payment</div>
       <div id="pendingList"></div>
@@ -396,6 +410,8 @@
   <h2>Order submitted</h2>
   <p id="coSuccessDesc"></p>
   <div class="ref" id="coSuccessInv"></div>
+  <div class="tagify-badge" id="coTagifyBadge" style="display:none"></div>
+  <a class="download-btn" id="coDownloadBtn" href="#" style="display:none">Download PDF</a>
   <button class="new-btn" onclick="resetCoForm()">New order</button>
 </div>
 
@@ -435,6 +451,15 @@
   function unlockApp() {
     document.getElementById('lockScreen').style.display = 'none';
     document.getElementById('appRoot').style.display = 'block';
+
+    // Loaded here (once auth is actually confirmed), not unconditionally at
+    // page load — firing this alongside the password-check fetch used to
+    // send two near-simultaneous requests to the same Apps Script Web App.
+    // Apps Script's redirect-based response can be flaky under concurrent
+    // requests (we hit the same failure mode ourselves testing Tagify
+    // today), so the pending list would silently fail on first load and
+    // only work once you manually pressed Refresh — a single, isolated call.
+    loadPendingInvoices();
   }
 
   function submitLockScreen() {
@@ -476,40 +501,40 @@
   // as one plain object now that item entry is free-text everywhere, so
   // there's still exactly one place prices/costs are defined.
   var CATALOG_DATA = {
-    "Gold Brushed Metal Card":       { price: 99, cost: 36.53, variants: ["Printed", "Engraved"] },
-    "Silver Brushed Metal Card":     { price: 99, cost: 36.53, variants: ["Printed", "Engraved"] },
-    "Rose Gold Brushed Metal Card":  { price: 99, cost: 36.53, variants: ["Printed", "Engraved"] },
-    "White Brushed Metal Card":      { price: 99, cost: 36.53, variants: ["Printed", "Custom Colour"] },
-    "Black Brushed Metal Card":      { price: 99, cost: 36.53, variants: ["Printed", "Custom Colour"] },
+    "Gold Brushed Metal Card":       { price: 99, cost: 33.00, variants: ["Printed", "Engraved"] },
+    "Silver Brushed Metal Card":     { price: 99, cost: 33.00, variants: ["Printed", "Engraved"] },
+    "Rose Gold Brushed Metal Card":  { price: 99, cost: 33.00, variants: ["Printed", "Engraved"] },
+    "White Brushed Metal Card":      { price: 99, cost: 33.00, variants: ["Printed", "Custom Colour"] },
+    "Black Brushed Metal Card":      { price: 99, cost: 33.00, variants: ["Printed", "Custom Colour"] },
 
-    "Black Coated Metal Card":  { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold", "Engraved / Rose Gold"] },
-    "Blue Coated Metal Card":   { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
-    "Green Coated Metal Card":  { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
-    "Purple Coated Metal Card": { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
-    "White Coated Metal Card":  { price: 99, cost: 30.44, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
-    "Red Coated Metal Card":    { price: 99, cost: 30.44, variants: ["Printed"] },
+    "Black Coated Metal Card":  { price: 99, cost: 33.00, variants: ["Printed", "Engraved / Silver", "Engraved / Gold", "Engraved / Rose Gold"] },
+    "Blue Coated Metal Card":   { price: 99, cost: 33.00, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
+    "Green Coated Metal Card":  { price: 99, cost: 33.00, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
+    "Purple Coated Metal Card": { price: 99, cost: 33.00, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
+    "White Coated Metal Card":  { price: 99, cost: 33.00, variants: ["Printed", "Engraved / Silver", "Engraved / Gold"] },
+    "Red Coated Metal Card":    { price: 99, cost: 33.00, variants: ["Printed"] },
 
-    "Bamboo Wood Card":       { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
-    "Black Bamboo Wood Card": { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
-    "Cherry Wood Card":       { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
-    "Walnut Wood Card":       { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
-    "Sapele Wood Card":       { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
-    "Oak Wood Card":          { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
-    "Maple Wood Card":        { price: 70, cost: 13.85, variants: ["Printed", "Engraved"] },
+    "Bamboo Wood Card":       { price: 70, cost: 12.50, variants: ["Printed", "Engraved"] },
+    "Black Bamboo Wood Card": { price: 70, cost: 12.50, variants: ["Printed", "Engraved"] },
+    "Cherry Wood Card":       { price: 70, cost: 12.50, variants: ["Printed", "Engraved"] },
+    "Walnut Wood Card":       { price: 70, cost: 12.50, variants: ["Printed", "Engraved"] },
+    "Sapele Wood Card":       { price: 70, cost: 12.50, variants: ["Printed", "Engraved"] },
+    "Oak Wood Card":          { price: 70, cost: 12.50, variants: ["Printed", "Engraved"] },
+    "Maple Wood Card":        { price: 70, cost: 12.50, variants: ["Printed", "Engraved"] },
 
-    "White Plastic Card":  { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
-    "Black Plastic Card":  { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
-    "Blue Plastic Card":   { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
-    "Purple Plastic Card": { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
-    "Red Plastic Card":    { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
-    "Green Plastic Card":  { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
-    "Pink Plastic Card":   { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
-    "Orange Plastic Card": { price: 70, cost: 12.82, variants: ["Matte", "Spot Gloss"] },
+    "White Plastic Card":  { price: 70, cost: 11.50, variants: ["Matte", "Spot Gloss"] },
+    "Black Plastic Card":  { price: 70, cost: 11.50, variants: ["Matte", "Spot Gloss"] },
+    "Blue Plastic Card":   { price: 70, cost: 11.50, variants: ["Matte", "Spot Gloss"] },
+    "Purple Plastic Card": { price: 70, cost: 11.50, variants: ["Matte", "Spot Gloss"] },
+    "Red Plastic Card":    { price: 70, cost: 11.50, variants: ["Matte", "Spot Gloss"] },
+    "Green Plastic Card":  { price: 70, cost: 11.50, variants: ["Matte", "Spot Gloss"] },
+    "Pink Plastic Card":   { price: 70, cost: 11.50, variants: ["Matte", "Spot Gloss"] },
+    "Orange Plastic Card": { price: 70, cost: 11.50, variants: ["Matte", "Spot Gloss"] },
 
-    "Black Table Talker": { price: 99, cost: 20.00, variants: [] },
-    "White Table Talker": { price: 99, cost: 20.00, variants: [] },
+    "Black Table Talker": { price: 99, cost: 32.50, variants: [] },
+    "White Table Talker": { price: 99, cost: 32.50, variants: [] },
 
-    "Keyring": { price: 60, cost: 12.82, variants: ["Regular", "Slanted"] },
+    "Keyring": { price: 60, cost: 12.50, variants: ["Regular", "Slanted"] },
 
     "Digital Member Name Badges": { price: 10, cost: 5.40, variants: [] },
     "£1/year Hosting Fee": { price: 1, cost: 0, variants: [] }
@@ -576,6 +601,71 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
+  }
+
+  /* ═══════════════ TAGIFY STATUS BADGE + RETRY ═══════════════ */
+
+  function tagifyIsGood_(status) {
+    return /^Forwarded/.test(String(status || ''));
+  }
+
+  // Populates a badge element with the Tagify status (green/red) and, on
+  // failure, an inline "Retry now" link that re-runs the forward in place.
+  function showTagifyBadge(elId, status, invNum) {
+    var el = document.getElementById(elId);
+    if (!status) { el.style.display = 'none'; return; }
+    var good = tagifyIsGood_(status);
+    el.className = 'tagify-badge ' + (good ? 'good' : 'bad');
+    el.innerHTML = 'NFC Tagify: ' + escapeHtml_(status) +
+      (!good && invNum
+        ? '<br><a href="#" onclick="retryTagifyInline(\'' + elId + '\',\'' + invNum + '\');return false;" style="color:#b3261e;text-decoration:underline;font-weight:700">Retry now</a>'
+        : '');
+    el.style.display = 'inline-block';
+  }
+
+  function retryTagifyInline(elId, invNum) {
+    var el = document.getElementById(elId);
+    el.className = 'tagify-badge bad';
+    el.innerHTML = 'Retrying…';
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'retryTagifyForward', password: getPassword(), invoiceNumber: invNum }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          el.className = 'tagify-badge bad';
+          el.textContent = data.message || 'Retry failed';
+          return;
+        }
+        showTagifyBadge(elId, data.tagifyStatus, invNum);
+      })
+      .catch(function (err) {
+        el.className = 'tagify-badge bad';
+        el.textContent = 'Retry failed: ' + err.message;
+      });
+  }
+
+  // Standalone tool: retry any already-placed order by invoice number
+  // (e.g. one from before this address issue was fixed, or from a
+  // previous session) — not just the order just submitted this session.
+  function retryTagifyForward() {
+    var invNum = document.getElementById('retryInvoiceNum').value.trim();
+    var resultEl = document.getElementById('retryTagifyResult');
+    if (!invNum) { showError('Enter an invoice number to retry.'); return; }
+    resultEl.innerHTML = '<span style="font-size:13px;color:#999">Retrying…</span>';
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'retryTagifyForward', password: getPassword(), invoiceNumber: invNum }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          resultEl.innerHTML = '<span class="tagify-badge bad">' + escapeHtml_(data.message || 'Retry failed') + '</span>';
+          return;
+        }
+        var good = tagifyIsGood_(data.tagifyStatus);
+        resultEl.innerHTML = '<span class="tagify-badge ' + (good ? 'good' : 'bad') + '">' + escapeHtml_(data.tagifyStatus) + '</span>';
+      })
+      .catch(function (err) {
+        resultEl.innerHTML = '<span class="tagify-badge bad">Retry failed: ' + escapeHtml_(err.message) + '</span>';
+      });
   }
 
   /* ═══════════════ SHARED ITEM ROWS (Draft + Paid) ═══════════════ */
@@ -651,14 +741,15 @@
     row.querySelector('.fItem').focus();
   }
 
-  // Splits "Product – suffix" or "Product - suffix" into its base name and
-  // suffix — recognises both a plain hyphen (" - ", typed variant suffixes)
-  // and an en dash (" – ", e.g. the BNI Draft Invoice button's "Digital
-  // Member Name Badges – BNI A380") as the separator, since both are 3
-  // characters so the same +3 offset works for either. Shared by every place
-  // that needs to match a typed/stored item name against the catalog.
+  // Splits "Product – suffix" into its base name and variant suffix.
+  // Recognises a plain hyphen (" - "), en dash (" – ", e.g. the BNI Draft
+  // Invoice button's "Digital Member Name Badges – BNI A380"), or em dash
+  // (" — ", the format variant pills write and INPERSON_TAGIFY's lookup
+  // keys expect) as the separator — all three are one character between two
+  // spaces, so the same +3 offset works for any of them. Shared by every
+  // place that needs to match a typed/stored item name against the catalog.
   function splitCatalogSuffix_(raw) {
-    var sepMatch = raw.match(/ [-–] /);
+    var sepMatch = raw.match(/ [-–—] /);
     var sep = sepMatch ? sepMatch.index : -1;
     return {
       baseName: (sep === -1 ? raw : raw.slice(0, sep)).trim(),
@@ -701,7 +792,7 @@
       btn.className = 'variant-pill-btn' + (label === activeSuffix ? ' active' : '');
       btn.textContent = label;
       btn.addEventListener('click', function () {
-        itemEl.value = baseName + ' - ' + label;
+        itemEl.value = baseName + ' — ' + label;
         if (overridePrice != null) priceEl.value = overridePrice.toFixed(2);
         wrap.querySelectorAll('.variant-pill-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
@@ -734,8 +825,21 @@
 
   function buildBasketFromRows() {
     return getItemRows().map(function (row) {
+      var name = row.querySelector('.fItem').value.trim();
+
+      // A catalog product with variants (Printed/Engraved, Matte/Spot
+      // Gloss, ...) but no variant ever picked — default to the first one,
+      // same as the old dropdown always did automatically. Keeps the
+      // description complete on the PDF/email/sheet, not just patched
+      // silently when Tagify forwarding looks it up server-side.
+      var split = splitCatalogSuffix_(name);
+      var data = CATALOG_LOOKUP[split.baseName.toLowerCase()];
+      if (data && data.variants && data.variants.length && !split.suffix) {
+        name = split.baseName + ' — ' + data.variants[0];
+      }
+
       return {
-        name:  row.querySelector('.fItem').value.trim(),
+        name:  name,
         qty:   parseFloat(row.querySelector('.fQty').value) || 0,
         price: parseFloat(row.querySelector('.fPrice').value) || 0,
         cost:  parseFloat(row.dataset.cost) || 0
@@ -1355,8 +1459,23 @@
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'failed');
 
+        var confirmedInv = data.invoiceNumber || invoiceNumAtSubmit;
+
         document.getElementById('coSuccessDesc').textContent = company + '\n' + summary + '\n\nTotal £' + total.toFixed(2) + '\nInvoice sent to ' + email;
-        document.getElementById('coSuccessInv').textContent = invoiceNumAtSubmit ? ('#' + invoiceNumAtSubmit) : '';
+        document.getElementById('coSuccessInv').textContent = confirmedInv ? ('#' + confirmedInv) : '';
+
+        showTagifyBadge('coTagifyBadge', data.tagifyStatus, confirmedInv);
+
+        var dlBtn = document.getElementById('coDownloadBtn');
+        if (data.pdfBase64) {
+          var pdfBlob = base64ToBlob(data.pdfBase64, 'application/pdf');
+          dlBtn.href = URL.createObjectURL(pdfBlob);
+          dlBtn.download = 'Invoice ' + (confirmedInv || '') + '.pdf';
+          dlBtn.style.display = 'block';
+        } else {
+          dlBtn.style.display = 'none';
+        }
+
         document.getElementById('coSuccessScreen').classList.add('show');
 
         convertingDraftRef = null;
@@ -1529,7 +1648,6 @@
   }
 
   addItemRow();
-  loadPendingInvoices();
 
   // Lets a link/redirect (e.g. the old standalone order form's URL) land
   // straight on Paid mode via ?tab=confirmed instead of the default Draft.
