@@ -55,6 +55,16 @@
 
   .item-row { border-top: 1px solid #f0f0ee; padding-top: 14px; margin-top: 14px; position: relative; }
   .item-row:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .item-row.row-error { outline: 2px solid #e53e3e; outline-offset: 6px; border-radius: 8px; }
+  .item-variant-pills-hint { display: none; color: #e53e3e; font-size: 12px; font-weight: 600; margin: -6px 0 8px; }
+  .item-row.row-error .item-variant-pills-hint { display: block; }
+  @keyframes rowShake {
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60% { transform: translateX(4px); }
+  }
+  .item-row.row-shake { animation: rowShake 0.5s; }
   .item-row-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .item-row-head span { font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.3px; }
   .remove-item-btn { background: none; border: none; color: #ccc; font-size: 20px; cursor: pointer; line-height: 1; padding: 0; }
@@ -249,8 +259,9 @@
     <div class="card">
       <div class="field">
         <label>Company / customer name</label>
-        <input type="text" id="fCompany">
+        <input type="text" id="fCompany" onblur="suggestAutofillFromHistory()">
       </div>
+      <div id="autofillSuggestion" style="display:none;font-size:12px;color:#1d4ed8;padding:0 16px 10px;cursor:pointer" onclick="applyAutofillSuggestion()"></div>
       <div class="field">
         <label>Email <span id="emailOptionalTag">(optional)</span></label>
         <input type="text" id="fEmail">
@@ -317,6 +328,10 @@
         </div>
       </div>
       <div class="co-field">
+        <label>Discount £ <span style="color:#999;font-weight:400">(optional)</span></label>
+        <input class="co-builder-input" type="number" id="coDiscount" placeholder="e.g. 20" step="0.01" min="0" inputmode="decimal" oninput="calcTotal()">
+      </div>
+      <div class="co-field">
         <label>Fulfilment</label>
         <div class="co-pay-row">
           <input class="co-pay-radio" type="radio" name="coFulfilment" id="coF1" value="Ship to customer">
@@ -353,15 +368,15 @@
 
     <button class="generate-btn" id="generateBtn" onclick="handleSubmit()">Create Draft Invoice</button>
 
-    <div class="card paid-only" id="retryTagifyCard" style="display:none; margin-top: 24px">
-      <div class="card-label">Retry Tagify Forward</div>
-      <div style="font-size:12px;color:#999;margin-bottom:10px;line-height:1.5">For an order already placed that didn't reach Tagify (e.g. no address at the time) — re-sends it using the order's current details, without creating a new order or invoice number.</div>
+    <div class="card paid-only" id="findOrderCard" style="display:none; margin-top: 24px">
+      <div class="card-label">Find Order</div>
+      <div style="font-size:12px;color:#999;margin-bottom:10px;line-height:1.5">Search past orders by invoice number or company name — e.g. to retry a Tagify forward that failed.</div>
       <div class="field">
-        <label>Invoice number</label>
-        <input type="text" id="retryInvoiceNum" placeholder="10156">
+        <label>Invoice number or company</label>
+        <input type="text" id="findOrderQuery" placeholder="10156 or Moor Lake Garage">
       </div>
-      <button type="button" class="add-item-btn" onclick="retryTagifyForward()">Retry Tagify Forward</button>
-      <div id="retryTagifyResult" style="margin-top:10px"></div>
+      <button type="button" class="add-item-btn" onclick="findOrders()">Search</button>
+      <div id="findOrderResults" style="margin-top:10px"></div>
     </div>
 
     <div class="card" id="pendingCard" style="margin-top: 24px">
@@ -644,28 +659,109 @@
       });
   }
 
-  // Standalone tool: retry any already-placed order by invoice number
-  // (e.g. one from before this address issue was fixed, or from a
-  // previous session) — not just the order just submitted this session.
-  function retryTagifyForward() {
-    var invNum = document.getElementById('retryInvoiceNum').value.trim();
-    var resultEl = document.getElementById('retryTagifyResult');
-    if (!invNum) { showError('Enter an invoice number to retry.'); return; }
-    resultEl.innerHTML = '<span style="font-size:13px;color:#999">Retrying…</span>';
-    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'retryTagifyForward', password: getPassword(), invoiceNumber: invNum }) })
+  // Find Order: search past orders by invoice number or company name.
+  // Each result gets its own Tagify badge (reusing showTagifyBadge) plus an
+  // explicit Retry button — the badge alone won't show for rows with no
+  // status yet (older orders, held/awaiting states), so the button is the
+  // reliable trigger regardless of current status.
+  function findOrders() {
+    var query = document.getElementById('findOrderQuery').value.trim();
+    var resultsEl = document.getElementById('findOrderResults');
+    if (!query) { showError('Enter an invoice number or company name to search.'); return; }
+    resultsEl.innerHTML = '<div style="font-size:13px;color:#999;padding:8px 0">Searching…</div>';
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'searchOrders', password: getPassword(), query: query }) })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') {
-          resultEl.innerHTML = '<span class="tagify-badge bad">' + escapeHtml_(data.message || 'Retry failed') + '</span>';
+          resultsEl.innerHTML = '<div style="font-size:13px;color:#e53e3e;padding:8px 0">' + escapeHtml_(data.message || 'Search failed') + '</div>';
           return;
         }
-        var good = tagifyIsGood_(data.tagifyStatus);
-        resultEl.innerHTML = '<span class="tagify-badge ' + (good ? 'good' : 'bad') + '">' + escapeHtml_(data.tagifyStatus) + '</span>';
+        renderOrderResults(data.orders || []);
       })
-      .catch(function (err) {
-        resultEl.innerHTML = '<span class="tagify-badge bad">Retry failed: ' + escapeHtml_(err.message) + '</span>';
+      .catch(function () {
+        resultsEl.innerHTML = '<div style="font-size:13px;color:#e53e3e;padding:8px 0">Search failed — please try again.</div>';
       });
+  }
+
+  function renderOrderResults(orders) {
+    var resultsEl = document.getElementById('findOrderResults');
+    if (!orders.length) {
+      resultsEl.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">No matching orders.</div>';
+      return;
+    }
+    resultsEl.innerHTML = '';
+    orders.forEach(function (o) {
+      var dateStr = '';
+      try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
+      var badgeId = 'findOrderBadge_' + o.invoiceNumber;
+
+      var row = document.createElement('div');
+      row.className = 'pending-item';
+      row.innerHTML =
+        '<div class="pending-item-top">' +
+          '<div class="pending-item-name">' + escapeHtml_(o.company) + '</div>' +
+          '<div class="pending-item-total">£' + parseFloat(o.total || 0).toFixed(2) + '</div>' +
+        '</div>' +
+        '<div class="pending-item-meta">#' + escapeHtml_(o.invoiceNumber) + (dateStr ? ' · ' + dateStr : '') + (o.paymentStatus ? ' · ' + escapeHtml_(o.paymentStatus) : '') + '</div>' +
+        '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>' +
+        '<div class="pending-item-actions">' +
+          '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>' +
+        '</div>';
+      row.querySelector('.retry-order-btn').addEventListener('click', function () {
+        retryTagifyInline(badgeId, o.invoiceNumber);
+      });
+      resultsEl.appendChild(row);
+      showTagifyBadge(badgeId, o.tagifyStatus, o.invoiceNumber);
+    });
+  }
+
+  // Repeat-customer autofill: on leaving the company field, check for a
+  // prior order under that name and offer to fill in contact details from
+  // it — free (no web search) and more reliable than looking the business
+  // up fresh, since it's exactly what the customer gave last time.
+  var autofillMatch = null;
+
+  function suggestAutofillFromHistory() {
+    var company = document.getElementById('fCompany').value.trim();
+    var suggestEl = document.getElementById('autofillSuggestion');
+    suggestEl.style.display = 'none';
+    autofillMatch = null;
+    if (company.length < 3) return;
+
+    var email = document.getElementById('fEmail').value.trim();
+    var phone = document.getElementById('coPhone') ? document.getElementById('coPhone').value.trim() : '';
+    var address = document.getElementById('coAddress') ? document.getElementById('coAddress').value.trim() : '';
+    if (email && phone && address) return; // every field already filled — nothing to offer
+
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'searchOrders', password: getPassword(), query: company }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status !== 'success' || !data.orders || !data.orders.length) return;
+        // Company field may have changed while this request was in flight.
+        if (document.getElementById('fCompany').value.trim() !== company) return;
+
+        autofillMatch = data.orders[0]; // newest first
+        var dateStr = '';
+        try { dateStr = new Date(autofillMatch.date).toLocaleDateString('en-GB'); } catch (e) {}
+        suggestEl.textContent = 'Found previous order #' + autofillMatch.invoiceNumber +
+          (dateStr ? ' (' + dateStr + ')' : '') + ' for this company — click to autofill contact details';
+        suggestEl.style.display = 'block';
+      })
+      .catch(function () {});
+  }
+
+  function applyAutofillSuggestion() {
+    if (!autofillMatch) return;
+    var emailEl = document.getElementById('fEmail');
+    if (autofillMatch.email && !emailEl.value.trim()) emailEl.value = autofillMatch.email;
+    var contactEl = document.getElementById('coContact');
+    if (contactEl && autofillMatch.contact && !contactEl.value.trim()) contactEl.value = autofillMatch.contact;
+    var phoneEl = document.getElementById('coPhone');
+    if (phoneEl && autofillMatch.phone && !phoneEl.value.trim()) phoneEl.value = autofillMatch.phone;
+    var addressEl = document.getElementById('coAddress');
+    if (addressEl && autofillMatch.address && !addressEl.value.trim()) addressEl.value = autofillMatch.address;
+    document.getElementById('autofillSuggestion').style.display = 'none';
   }
 
   /* ═══════════════ SHARED ITEM ROWS (Draft + Paid) ═══════════════ */
@@ -684,6 +780,7 @@
       '<div class="item-row-summary" style="display:none"></div>' +
       '<div class="item-row-body">' +
         '<div class="field"><label>Description</label><input type="text" class="fItem" list="catalogDatalist"></div>' +
+        '<div class="item-variant-pills-hint">Please choose — Printed or Engraved (and colour):</div>' +
         '<div class="item-variant-pills"></div>' +
         '<div class="row2">' +
           '<div class="field"><label>Qty</label><input type="number" class="fQty" min="0" step="1"></div>' +
@@ -796,6 +893,7 @@
         if (overridePrice != null) priceEl.value = overridePrice.toFixed(2);
         wrap.querySelectorAll('.variant-pill-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
+        row.classList.remove('row-error');
         calcTotal();
         collapseItemRow(row);
       });
@@ -823,18 +921,50 @@
     return Array.prototype.slice.call(document.getElementById('itemsContainer').children);
   }
 
+  // Which item row (if any) is a catalog product with more than one real
+  // variant (Printed / Engraved — Gold / Engraved — Silver / Engraved —
+  // Rose Gold, etc.) but hasn't had one picked. Used to BLOCK submission
+  // rather than silently guess — Tagify needs to know exactly which to
+  // manufacture, so a missing choice must never quietly become "Printed"
+  // by default; it has to be a real decision every time.
+  function findMissingVariantRow_() {
+    var rows = getItemRows();
+    for (var i = 0; i < rows.length; i++) {
+      var name = rows[i].querySelector('.fItem').value.trim();
+      if (!name) continue;
+      var split = splitCatalogSuffix_(name);
+      var data = CATALOG_LOOKUP[split.baseName.toLowerCase()];
+      if (data && data.variants && data.variants.length > 1 && !split.suffix) {
+        return rows[i];
+      }
+    }
+    return null;
+  }
+
+  // Visually forces the choice: expands the row (variant pills only show
+  // expanded), red outline + a shake, scrolled into view — the same "shakes
+  // the box in red" behaviour a native required-field validation gives you.
+  function flagMissingVariantRow_(row) {
+    expandItemRow(row);
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.remove('row-shake');
+    void row.offsetWidth; // restart the CSS animation if it's already flagged
+    row.classList.add('row-error', 'row-shake');
+    row.querySelector('.fItem').focus();
+    setTimeout(function () { row.classList.remove('row-shake'); }, 500);
+  }
+
   function buildBasketFromRows() {
     return getItemRows().map(function (row) {
       var name = row.querySelector('.fItem').value.trim();
 
-      // A catalog product with variants (Printed/Engraved, Matte/Spot
-      // Gloss, ...) but no variant ever picked — default to the first one,
-      // same as the old dropdown always did automatically. Keeps the
-      // description complete on the PDF/email/sheet, not just patched
-      // silently when Tagify forwarding looks it up server-side.
+      // Only auto-completes when there's exactly one possible variant —
+      // nothing to actually decide, so it's not a guess. Anything with a
+      // real choice (2+ variants) is caught by findMissingVariantRow_
+      // above and blocks submission instead of being silently picked.
       var split = splitCatalogSuffix_(name);
       var data = CATALOG_LOOKUP[split.baseName.toLowerCase()];
-      if (data && data.variants && data.variants.length && !split.suffix) {
+      if (data && data.variants && data.variants.length === 1 && !split.suffix) {
         name = split.baseName + ' — ' + data.variants[0];
       }
 
@@ -856,28 +986,37 @@
   }
 
   function calcTotal() {
-    var total = 0;
+    var grossTotal = 0;
     getItemRows().forEach(function (row) {
       var qty = parseFloat(row.querySelector('.fQty').value) || 0;
       var price = parseFloat(row.querySelector('.fPrice').value) || 0;
-      total += qty * price;
+      grossTotal += qty * price;
     });
 
     if (invoiceMode === 'paid') {
+      var discountEl = document.getElementById('coDiscount');
+      var discount = discountEl ? (parseFloat(discountEl.value) || 0) : 0;
+      if (discount < 0) discount = 0;
+      if (discount > grossTotal) discount = grossTotal;
+      var total = grossTotal - discount;
+
       var pay = document.querySelector('input[name="coPay"]:checked');
       var isLopay = pay && pay.value === 'Lopay card';
       var fee = isLopay ? total * 0.0099 + 0.08 : 0;
       var net = total - fee;
       document.getElementById('coTotalVal').textContent = '£' + total.toFixed(2);
       var feeLine = document.getElementById('coFeeLine');
-      if (isLopay && fee > 0) {
-        feeLine.textContent = 'Lopay fee −£' + fee.toFixed(2) + ' → you keep £' + net.toFixed(2);
+      var feeLineText = '';
+      if (discount > 0) feeLineText += 'Discount −£' + discount.toFixed(2) + ' applied. ';
+      if (isLopay && fee > 0) feeLineText += 'Lopay fee −£' + fee.toFixed(2) + ' → you keep £' + net.toFixed(2);
+      if (feeLineText) {
+        feeLine.textContent = feeLineText;
         feeLine.style.display = 'block';
       } else {
         feeLine.style.display = 'none';
       }
     } else {
-      document.getElementById('totalPreview').textContent = '£' + total.toFixed(2);
+      document.getElementById('totalPreview').textContent = '£' + grossTotal.toFixed(2);
     }
   }
 
@@ -1027,32 +1166,35 @@
     document.getElementById('fEmail').value = inv.email || '';
     hideDepositOption(); // "Paid in full" — this is a paid draft being closed out
 
-    // Draft items that are already exact catalog names (thanks to catalog
-    // matching at dictation time) carry straight over. Only genuinely custom
-    // items need a hand: they're dropped into the dictation box so one tap
-    // of Parse handles the rest.
+    // Every item on the draft gets its own row, full stop — what was quoted
+    // is what must carry over. This used to only add rows for items that
+    // matched a catalog name exactly, silently dropping anything else into
+    // the dictation box for a manual "Parse" that was easy to miss — that's
+    // how items (e.g. a metal card saved under a slightly different name)
+    // went missing from a converted order. Catalog matching is now purely
+    // informational (flagged in the banner below), never a condition for
+    // whether an item makes it into the order at all.
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
     var unmatched = [];
     (inv.items || []).forEach(function (it) {
       var name = it.name || it.item || '';
+      if (!name) return;
+      addItemRow({ item: name, qty: it.qty || 1, price: it.unit || it.unitPrice || '' });
       // Match on the base name (before any " - "/" – " suffix) — a plain
       // full-string lookup would miss e.g. "Digital Member Name Badges –
       // BNI A380", since the chapter name is never itself a catalog key.
-      if (name && CATALOG_LOOKUP[splitCatalogSuffix_(name).baseName.toLowerCase()]) {
-        addItemRow({ item: name, qty: it.qty || 1, price: it.unit || it.unitPrice || '' });
-      } else if (name) {
-        unmatched.push(name + (it.qty ? ' x' + it.qty : ''));
+      if (!CATALOG_LOOKUP[splitCatalogSuffix_(name).baseName.toLowerCase()]) {
+        unmatched.push(name);
       }
     });
     if (!getItemRows().length) addItemRow();
     calcTotal();
-    document.getElementById('quickline').value = unmatched.join(', ');
 
     var banner = document.getElementById('convertBanner');
     banner.style.display = 'flex';
     document.getElementById('convertBannerText').textContent = unmatched.length
-      ? 'Closing out draft ' + inv.ref + ' (' + inv.company + ') — ' + unmatched.length + ' item(s) need matching below.'
+      ? 'Closing out draft ' + inv.ref + ' (' + inv.company + ') — all items carried over; double-check pricing/variants on: ' + unmatched.join(', ')
       : 'Closing out draft ' + inv.ref + ' (' + inv.company + ') — items already matched, just confirm and submit.';
 
     setTab('invoice');
@@ -1351,6 +1493,8 @@
     input.focus();
   }
 
+  var MAPS_LINK_RE = /https?:\/\/[^\s]*(?:maps\.app\.goo\.gl|google\.[a-z.]+\/maps)[^\s]*/i;
+
   function parseCoQuickline() {
     var text = document.getElementById('quickline').value.trim();
     if (!text) return;
@@ -1358,17 +1502,26 @@
     var btn = document.getElementById('parseBtn');
     var originalLabel = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Parsing…';
     document.getElementById('errorMsg').classList.remove('show');
 
+    // A pasted Google Maps link has no items to parse — go straight to the
+    // web-lookup path instead of the catalog item parser.
+    if (MAPS_LINK_RE.test(text)) {
+      btn.textContent = 'Looking up…';
+      lookupBusinessAndFill_(text, function () {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      });
+      return;
+    }
+
+    btn.textContent = 'Parsing…';
     fetch(SCRIPT_URL, {
       method: 'POST',
       body: JSON.stringify({ action: 'parseConfirmedOrderText', text: text, password: getPassword() })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'parse failed');
 
@@ -1377,6 +1530,7 @@
         if (data.email) document.getElementById('fEmail').value = data.email;
         if (data.phone) document.getElementById('coPhone').value = data.phone;
         if (data.address) document.getElementById('coAddress').value = data.address;
+        if (data.discount) document.getElementById('coDiscount').value = data.discount;
 
         var matchedAny = false;
         (data.items || []).forEach(function (it) {
@@ -1390,6 +1544,20 @@
         if (!matchedAny) {
           showError('Got the customer details, but no items matched the catalog — add products below manually.');
         }
+
+        // Company named but no contact details said — look them up rather
+        // than leaving the fields blank for a company that dictated no
+        // address/phone/email of its own.
+        if (data.company && !data.address && !data.phone && !data.email) {
+          btn.textContent = 'Looking up contact details…';
+          lookupBusinessAndFill_(data.company, function () {
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+          });
+        } else {
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }
       })
       .catch(function () {
         btn.disabled = false;
@@ -1398,8 +1566,49 @@
       });
   }
 
+  // Shared by the Maps-link path and the no-contact-details fallback above —
+  // fills in only fields the form doesn't already have, never overwrites
+  // something the user already typed.
+  function lookupBusinessAndFill_(query, done) {
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'lookupBusiness', text: query, password: getPassword() })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        done();
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') { showError(data.message || 'Could not find that business — fill in details manually.'); return; }
+
+        var companyEl = document.getElementById('fCompany');
+        if (data.company && !companyEl.value.trim()) companyEl.value = data.company;
+        var addressEl = document.getElementById('coAddress');
+        if (data.address && !addressEl.value.trim()) addressEl.value = data.address;
+        var phoneEl = document.getElementById('coPhone');
+        if (data.phone && !phoneEl.value.trim()) phoneEl.value = data.phone;
+        var emailEl = document.getElementById('fEmail');
+        if (data.email && !emailEl.value.trim()) emailEl.value = data.email;
+
+        if (!data.address && !data.phone && !data.email) {
+          showError('Found the business but no published contact details — fill them in manually.');
+        }
+      })
+      .catch(function () {
+        done();
+        showError('Business lookup failed — please fill in the fields below manually.');
+      });
+  }
+
   function handlePaidSubmit() {
     document.getElementById('errorMsg').classList.remove('show');
+
+    var missingRow = findMissingVariantRow_();
+    if (missingRow) {
+      flagMissingVariantRow_(missingRow);
+      showError('Choose Printed or Engraved (and colour) for the highlighted item before this can be submitted.');
+      return;
+    }
+
     var basket = buildBasketFromRows().filter(function (i) { return i.name; });
 
     if (!basket.length) { showError('Please add at least one item.'); return; }
@@ -1445,11 +1654,13 @@
       fulfilment:    fulfilEl.value,
       source:        document.getElementById('coSource').value.trim(),
       notes:         document.getElementById('coNotes').value.trim(),
+      discount:      parseFloat(document.getElementById('coDiscount').value) || 0,
       orderKey:      currentOrderKey
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
 
-    var total   = basket.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
+    var grossTotal = basket.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
+    var total = Math.max(0, grossTotal - payload.discount);
     var summary = basket.map(function (i) { return i.name + ' x' + i.qty; }).join('\n');
     var invoiceNumAtSubmit = coInvoiceNum;
 
@@ -1460,8 +1671,9 @@
         if (data.status !== 'success') throw new Error(data.message || 'failed');
 
         var confirmedInv = data.invoiceNumber || invoiceNumAtSubmit;
+        var discountLine = payload.discount > 0 ? ('\nDiscount applied: -£' + payload.discount.toFixed(2)) : '';
 
-        document.getElementById('coSuccessDesc').textContent = company + '\n' + summary + '\n\nTotal £' + total.toFixed(2) + '\nInvoice sent to ' + email;
+        document.getElementById('coSuccessDesc').textContent = company + '\n' + summary + discountLine + '\n\nTotal £' + total.toFixed(2) + '\nInvoice sent to ' + email;
         document.getElementById('coSuccessInv').textContent = confirmedInv ? ('#' + confirmedInv) : '';
 
         showTagifyBadge('coTagifyBadge', data.tagifyStatus, confirmedInv);
@@ -1504,6 +1716,7 @@
     document.getElementById('coSource').value = '';
     document.getElementById('coNotes').value = '';
     document.getElementById('coDeposit').value = '';
+    document.getElementById('coDiscount').value = '';
     document.querySelectorAll('input[name="coPay"], input[name="coFulfilment"], input[name="coSourceType"]').forEach(function (r) { r.checked = false; });
     hideDepositOption();
     document.getElementById('itemsContainer').innerHTML = '';
