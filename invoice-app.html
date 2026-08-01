@@ -223,6 +223,17 @@
 </div>
 
 <div class="page" id="appRoot" style="display:none">
+  <div class="card" id="topSearchCard" style="margin-bottom:12px">
+    <div class="field">
+      <label>Search orders by invoice number or company</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="topSearchQuery" placeholder="10161 or Reilly Painters" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();findOrders('topSearchQuery','topSearchResults');}">
+        <button type="button" class="add-item-btn" style="width:auto;white-space:nowrap;margin-top:0;padding:0 18px" onclick="findOrders('topSearchQuery','topSearchResults')">Search</button>
+      </div>
+    </div>
+    <div id="topSearchResults" style="margin-top:6px"></div>
+  </div>
+
   <div class="toggle" id="tabToggle">
     <button type="button" id="btnInvoice" class="active" onclick="setTab('invoice')">Invoice</button>
     <button type="button" id="btnBni" onclick="setTab('bni')">BNI Badges</button>
@@ -664,9 +675,14 @@
   // explicit Retry button — the badge alone won't show for rows with no
   // status yet (older orders, held/awaiting states), so the button is the
   // reliable trigger regardless of current status.
-  function findOrders() {
-    var query = document.getElementById('findOrderQuery').value.trim();
-    var resultsEl = document.getElementById('findOrderResults');
+  // queryElId/resultsElId let this same search power both the always-visible
+  // bar at the top of the page and the Find Order card further down — each
+  // just points it at its own input/results elements.
+  function findOrders(queryElId, resultsElId) {
+    queryElId = queryElId || 'findOrderQuery';
+    resultsElId = resultsElId || 'findOrderResults';
+    var query = document.getElementById(queryElId).value.trim();
+    var resultsEl = document.getElementById(resultsElId);
     if (!query) { showError('Enter an invoice number or company name to search.'); return; }
     resultsEl.innerHTML = '<div style="font-size:13px;color:#999;padding:8px 0">Searching…</div>';
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'searchOrders', password: getPassword(), query: query }) })
@@ -677,15 +693,16 @@
           resultsEl.innerHTML = '<div style="font-size:13px;color:#e53e3e;padding:8px 0">' + escapeHtml_(data.message || 'Search failed') + '</div>';
           return;
         }
-        renderOrderResults(data.orders || []);
+        renderOrderResults(data.orders || [], resultsElId);
       })
       .catch(function () {
         resultsEl.innerHTML = '<div style="font-size:13px;color:#e53e3e;padding:8px 0">Search failed — please try again.</div>';
       });
   }
 
-  function renderOrderResults(orders) {
-    var resultsEl = document.getElementById('findOrderResults');
+  function renderOrderResults(orders, resultsElId) {
+    resultsElId = resultsElId || 'findOrderResults';
+    var resultsEl = document.getElementById(resultsElId);
     if (!orders.length) {
       resultsEl.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">No matching orders.</div>';
       return;
@@ -694,7 +711,9 @@
     orders.forEach(function (o) {
       var dateStr = '';
       try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
-      var badgeId = 'findOrderBadge_' + o.invoiceNumber;
+      // Namespaced by resultsElId — the top bar and the Find Order card can
+      // both show the same invoice at once without colliding DOM ids.
+      var badgeId = 'findOrderBadge_' + resultsElId + '_' + o.invoiceNumber;
 
       var row = document.createElement('div');
       row.className = 'pending-item';
