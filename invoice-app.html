@@ -711,9 +711,10 @@
     orders.forEach(function (o) {
       var dateStr = '';
       try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
+      var idLabel = o.isDraft ? ('Draft ' + escapeHtml_(o.draftRef || '')) : ('#' + escapeHtml_(o.invoiceNumber));
       // Namespaced by resultsElId — the top bar and the Find Order card can
       // both show the same invoice at once without colliding DOM ids.
-      var badgeId = 'findOrderBadge_' + resultsElId + '_' + o.invoiceNumber;
+      var badgeId = 'findOrderBadge_' + resultsElId + '_' + (o.isDraft ? o.draftRef : o.invoiceNumber);
 
       var row = document.createElement('div');
       row.className = 'pending-item';
@@ -722,16 +723,19 @@
           '<div class="pending-item-name">' + escapeHtml_(o.company) + '</div>' +
           '<div class="pending-item-total">£' + parseFloat(o.total || 0).toFixed(2) + '</div>' +
         '</div>' +
-        '<div class="pending-item-meta">#' + escapeHtml_(o.invoiceNumber) + (dateStr ? ' · ' + dateStr : '') + (o.paymentStatus ? ' · ' + escapeHtml_(o.paymentStatus) : '') + '</div>' +
-        '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>' +
-        '<div class="pending-item-actions">' +
-          '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>' +
-        '</div>';
-      row.querySelector('.retry-order-btn').addEventListener('click', function () {
-        retryTagifyInline(badgeId, o.invoiceNumber);
-      });
+        '<div class="pending-item-meta">' + idLabel + (dateStr ? ' · ' + dateStr : '') + (o.paymentStatus ? ' · ' + escapeHtml_(o.paymentStatus) : '') + '</div>' +
+        (o.isDraft ? '' :
+          '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>' +
+          '<div class="pending-item-actions">' +
+            '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>' +
+          '</div>');
+      if (!o.isDraft) {
+        row.querySelector('.retry-order-btn').addEventListener('click', function () {
+          retryTagifyInline(badgeId, o.invoiceNumber);
+        });
+      }
       resultsEl.appendChild(row);
-      showTagifyBadge(badgeId, o.tagifyStatus, o.invoiceNumber);
+      if (!o.isDraft) showTagifyBadge(badgeId, o.tagifyStatus, o.invoiceNumber);
     });
   }
 
