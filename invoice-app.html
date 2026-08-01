@@ -261,7 +261,7 @@
         <label>Company / customer name</label>
         <input type="text" id="fCompany" onblur="suggestAutofillFromHistory()">
       </div>
-      <div id="autofillSuggestion" style="display:none;font-size:12px;color:#1d4ed8;padding:0 16px 10px;cursor:pointer" onclick="applyAutofillSuggestion()"></div>
+      <div id="autofillSuggestion" style="display:none;font-size:12px;color:#1d4ed8;padding:0 16px 10px"></div>
       <div class="field">
         <label>Email <span id="emailOptionalTag">(optional)</span></label>
         <input type="text" id="fEmail">
@@ -716,23 +716,21 @@
     });
   }
 
-  // Repeat-customer autofill: on leaving the company field, check for a
-  // prior order under that name and offer to fill in contact details from
-  // it — free (no web search) and more reliable than looking the business
-  // up fresh, since it's exactly what the customer gave last time.
-  var autofillMatch = null;
-
+  // Repeat-customer autofill: on leaving the company field, look up a prior
+  // order under that name and fill in contact details straight away — free
+  // (no web search) and more reliable than looking the business up fresh,
+  // since it's exactly what the customer gave last time. Never overwrites a
+  // field you've already typed something into.
   function suggestAutofillFromHistory() {
     var company = document.getElementById('fCompany').value.trim();
     var suggestEl = document.getElementById('autofillSuggestion');
     suggestEl.style.display = 'none';
-    autofillMatch = null;
     if (company.length < 3) return;
 
     var email = document.getElementById('fEmail').value.trim();
     var phone = document.getElementById('coPhone') ? document.getElementById('coPhone').value.trim() : '';
     var address = document.getElementById('coAddress') ? document.getElementById('coAddress').value.trim() : '';
-    if (email && phone && address) return; // every field already filled — nothing to offer
+    if (email && phone && address) return; // every field already filled — nothing to fill
 
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'searchOrders', password: getPassword(), query: company }) })
       .then(function (r) { return r.json(); })
@@ -741,27 +739,25 @@
         // Company field may have changed while this request was in flight.
         if (document.getElementById('fCompany').value.trim() !== company) return;
 
-        autofillMatch = data.orders[0]; // newest first
-        var dateStr = '';
-        try { dateStr = new Date(autofillMatch.date).toLocaleDateString('en-GB'); } catch (e) {}
-        suggestEl.textContent = 'Found previous order #' + autofillMatch.invoiceNumber +
-          (dateStr ? ' (' + dateStr + ')' : '') + ' for this company — click to autofill contact details';
-        suggestEl.style.display = 'block';
+        var match = data.orders[0]; // newest first
+        var filled = [];
+        var emailEl = document.getElementById('fEmail');
+        if (match.email && !emailEl.value.trim()) { emailEl.value = match.email; filled.push('email'); }
+        var contactEl = document.getElementById('coContact');
+        if (contactEl && match.contact && !contactEl.value.trim()) { contactEl.value = match.contact; filled.push('contact name'); }
+        var phoneEl = document.getElementById('coPhone');
+        if (phoneEl && match.phone && !phoneEl.value.trim()) { phoneEl.value = match.phone; filled.push('phone'); }
+        var addressEl = document.getElementById('coAddress');
+        if (addressEl && match.address && !addressEl.value.trim()) { addressEl.value = match.address; filled.push('address'); }
+
+        if (filled.length) {
+          var dateStr = '';
+          try { dateStr = new Date(match.date).toLocaleDateString('en-GB'); } catch (e) {}
+          suggestEl.textContent = 'Autofilled ' + filled.join(', ') + ' from order #' + match.invoiceNumber + (dateStr ? ' (' + dateStr + ')' : '') + '.';
+          suggestEl.style.display = 'block';
+        }
       })
       .catch(function () {});
-  }
-
-  function applyAutofillSuggestion() {
-    if (!autofillMatch) return;
-    var emailEl = document.getElementById('fEmail');
-    if (autofillMatch.email && !emailEl.value.trim()) emailEl.value = autofillMatch.email;
-    var contactEl = document.getElementById('coContact');
-    if (contactEl && autofillMatch.contact && !contactEl.value.trim()) contactEl.value = autofillMatch.contact;
-    var phoneEl = document.getElementById('coPhone');
-    if (phoneEl && autofillMatch.phone && !phoneEl.value.trim()) phoneEl.value = autofillMatch.phone;
-    var addressEl = document.getElementById('coAddress');
-    if (addressEl && autofillMatch.address && !addressEl.value.trim()) addressEl.value = autofillMatch.address;
-    document.getElementById('autofillSuggestion').style.display = 'none';
   }
 
   /* ═══════════════ SHARED ITEM ROWS (Draft + Paid) ═══════════════ */
@@ -797,6 +793,7 @@
       this.value = titleCase(this.value.trim());
       checkItemVariants(row);
       calcTotal();
+      collapseItemRow(row);
     });
     row.querySelector('.item-row-summary').addEventListener('click', function () { expandItemRow(row); });
 
@@ -823,6 +820,13 @@
     var qty = parseFloat(qtyEl.value);
     var price = parseFloat(priceEl.value);
     if (!item || !qty || qty <= 0 || isNaN(price) || price < 0) return;
+
+    // Never fold away a still-unresolved variant choice (Printed vs
+    // Engraved, or which colour) — the whole point of showing the pills is
+    // so that choice can't be silently skipped by the row looking "done".
+    var split = splitCatalogSuffix_(item);
+    var catalogData = CATALOG_LOOKUP[split.baseName.toLowerCase()];
+    if (catalogData && catalogData.variants && catalogData.variants.length > 1 && !split.suffix) return;
 
     var summary = row.querySelector('.item-row-summary');
     summary.innerHTML =
@@ -1655,6 +1659,7 @@
       source:        document.getElementById('coSource').value.trim(),
       notes:         document.getElementById('coNotes').value.trim(),
       discount:      parseFloat(document.getElementById('coDiscount').value) || 0,
+      depositAmount: (isDepositMode && dep) ? parseFloat(dep) || 0 : 0,
       orderKey:      currentOrderKey
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
