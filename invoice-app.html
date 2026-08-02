@@ -724,11 +724,14 @@
           '<div class="pending-item-total">£' + parseFloat(o.total || 0).toFixed(2) + '</div>' +
         '</div>' +
         '<div class="pending-item-meta">' + idLabel + (dateStr ? ' · ' + dateStr : '') + (o.paymentStatus ? ' · ' + escapeHtml_(o.paymentStatus) : '') + '</div>' +
-        (o.isDraft ? '' :
-          '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>' +
-          '<div class="pending-item-actions">' +
-            '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>' +
-          '</div>');
+        (o.isDraft ? '' : '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>') +
+        '<div class="pending-item-actions">' +
+          '<button type="button" class="pending-mini-btn new-order-btn">New Order</button>' +
+          (o.isDraft ? '' : '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>') +
+        '</div>';
+      row.querySelector('.new-order-btn').addEventListener('click', function () {
+        startNewOrderFromSearch_(o);
+      });
       if (!o.isDraft) {
         row.querySelector('.retry-order-btn').addEventListener('click', function () {
           retryTagifyInline(badgeId, o.invoiceNumber);
@@ -737,6 +740,27 @@
       resultsEl.appendChild(row);
       if (!o.isDraft) showTagifyBadge(badgeId, o.tagifyStatus, o.invoiceNumber);
     });
+  }
+
+  // "New Order" on a search result: starts a fresh Draft or Paid form
+  // (whichever tab/mode is currently selected) pre-filled with that repeat
+  // customer's contact details — same idea as the company-blur autofill,
+  // just triggered from search instead of having to retype the name first.
+  function startNewOrderFromSearch_(o) {
+    if (invoiceMode === 'paid') {
+      resetCoForm();
+    } else {
+      resetForm();
+    }
+    document.getElementById('fCompany').value = o.company || '';
+    document.getElementById('fEmail').value = o.email || '';
+    if (invoiceMode === 'paid') {
+      if (o.contact) document.getElementById('coContact').value = o.contact;
+      if (o.phone) document.getElementById('coPhone').value = o.phone;
+      if (o.address) document.getElementById('coAddress').value = o.address;
+    }
+    setTab('invoice');
+    window.scrollTo(0, 0);
   }
 
   // Repeat-customer autofill: on leaving the company field, look up a prior
