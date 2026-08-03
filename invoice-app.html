@@ -683,8 +683,10 @@
     resultsElId = resultsElId || 'findOrderResults';
     var query = document.getElementById(queryElId).value.trim();
     var resultsEl = document.getElementById(resultsElId);
-    if (!query) { showError('Enter an invoice number or company name to search.'); return; }
-    resultsEl.innerHTML = '<div style="font-size:13px;color:#999;padding:8px 0">Searching…</div>';
+    // Empty query = "show everything awaiting payment" (handled server-side)
+    // rather than an error — saves switching to the Draft tab and scrolling
+    // down to the Awaiting Payment list just to find one of them.
+    resultsEl.innerHTML = '<div style="font-size:13px;color:#999;padding:8px 0">' + (query ? 'Searching…' : 'Loading orders awaiting payment…') + '</div>';
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'searchOrders', password: getPassword(), query: query }) })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -742,12 +744,19 @@
         (o.isDraft ? '' : '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>') +
         '<div class="pending-item-actions">' +
           '<button type="button" class="pending-mini-btn new-order-btn">New Order</button>' +
-          (o.isDraft ? '' : '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>') +
+          (o.isDraft ? '<button type="button" class="pending-mini-btn mark-paid-btn">Mark Paid</button>' : '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>') +
         '</div>';
       row.querySelector('.new-order-btn').addEventListener('click', function () {
         startNewOrderFromSearch_(o);
       });
-      if (!o.isDraft) {
+      if (o.isDraft) {
+        // Same "Mark Paid" flow as the Draft tab's Awaiting Payment list —
+        // just reachable straight from search, no scrolling/tab-switching
+        // needed to find the same draft again.
+        row.querySelector('.mark-paid-btn').addEventListener('click', function () {
+          startConvertDraft({ ref: o.draftRef, company: o.company, email: o.email, items: o.items });
+        });
+      } else {
         row.querySelector('.retry-order-btn').addEventListener('click', function () {
           retryTagifyInline(badgeId, o.invoiceNumber);
         });
@@ -1294,7 +1303,7 @@
       : 'Closing out draft ' + inv.ref + ' (' + inv.company + ') — items already matched, just confirm and submit.';
 
     setTab('invoice');
-    window.scrollTo(0, 0);
+    document.getElementById('invoiceScreen').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function cancelConvertDraft() {
