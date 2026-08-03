@@ -331,10 +331,10 @@
       </div>
       <div class="co-field">
         <label>Payment status</label>
-        <div style="font-size:14px;color:#555;padding:4px 0 2px">Paid in full</div>
+        <div style="font-size:14px;color:#555;padding:4px 0 2px" id="coPayStatusLabel">Paid in full</div>
         <a href="#" class="deposit-link" id="coDepositLink" onclick="showDepositOption(event)">Received a deposit instead?</a>
         <div id="coDepositWrap" style="display:none;margin-top:10px;">
-          <input class="co-builder-input" type="number" id="coDeposit" placeholder="Deposit amount e.g. 50.00" step="0.01" min="0" inputmode="decimal">
+          <input class="co-builder-input" type="number" id="coDeposit" placeholder="Deposit amount e.g. 50.00" step="0.01" min="0" inputmode="decimal" oninput="updatePayStatusLabel_()">
           <a href="#" class="deposit-link" id="coDepositCancelLink" onclick="hideDepositOption(event)" style="display:block;margin-top:6px">Actually, paid in full</a>
         </div>
       </div>
@@ -690,24 +690,39 @@
       .then(function (data) {
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') {
-          resultsEl.innerHTML = '<div style="font-size:13px;color:#e53e3e;padding:8px 0">' + escapeHtml_(data.message || 'Search failed') + '</div>';
+          resultsEl.innerHTML = '<div style="font-size:13px;color:#e53e3e;padding:8px 0">' + escapeHtml_(data.message || 'Search failed') + '</div>' + clearResultsBtnHtml_(resultsElId, queryElId);
           return;
         }
-        renderOrderResults(data.orders || [], resultsElId);
+        renderOrderResults(data.orders || [], resultsElId, queryElId);
       })
       .catch(function () {
-        resultsEl.innerHTML = '<div style="font-size:13px;color:#e53e3e;padding:8px 0">Search failed — please try again.</div>';
+        resultsEl.innerHTML = '<div style="font-size:13px;color:#e53e3e;padding:8px 0">Search failed — please try again.</div>' + clearResultsBtnHtml_(resultsElId, queryElId);
       });
   }
 
-  function renderOrderResults(orders, resultsElId) {
+  // Small "Clear" link shown above search results/errors so a dead-end
+  // search doesn't just sit there — clears both the results and the typed
+  // query so the search bar is back to its empty starting state.
+  function clearResultsBtnHtml_(resultsElId, queryElId) {
+    return '<button type="button" onclick="clearOrderResults_(\'' + resultsElId + '\',\'' + queryElId + '\')" ' +
+      'style="font-size:12px;color:#888;background:none;border:none;padding:0 0 8px;cursor:pointer;text-decoration:underline;display:block">Clear</button>';
+  }
+
+  function clearOrderResults_(resultsElId, queryElId) {
+    document.getElementById(resultsElId).innerHTML = '';
+    var q = document.getElementById(queryElId);
+    if (q) q.value = '';
+  }
+
+  function renderOrderResults(orders, resultsElId, queryElId) {
     resultsElId = resultsElId || 'findOrderResults';
+    queryElId = queryElId || 'findOrderQuery';
     var resultsEl = document.getElementById(resultsElId);
     if (!orders.length) {
-      resultsEl.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">No matching orders.</div>';
+      resultsEl.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">No matching orders.</div>' + clearResultsBtnHtml_(resultsElId, queryElId);
       return;
     }
-    resultsEl.innerHTML = '';
+    resultsEl.innerHTML = clearResultsBtnHtml_(resultsElId, queryElId);
     orders.forEach(function (o) {
       var dateStr = '';
       try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
@@ -760,7 +775,7 @@
       if (o.address) document.getElementById('coAddress').value = o.address;
     }
     setTab('invoice');
-    window.scrollTo(0, 0);
+    document.getElementById('invoiceScreen').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // Repeat-customer autofill: on leaving the company field, look up a prior
@@ -834,13 +849,13 @@
 
     row.querySelector('.fQty').addEventListener('input', calcTotal);
     row.querySelector('.fPrice').addEventListener('input', calcTotal);
-    row.querySelector('.fQty').addEventListener('blur', function () { collapseItemRow(row); });
-    row.querySelector('.fPrice').addEventListener('blur', function () { collapseItemRow(row); });
+    row.querySelector('.fQty').addEventListener('blur', function () { scheduleRowCollapse_(row); });
+    row.querySelector('.fPrice').addEventListener('blur', function () { scheduleRowCollapse_(row); });
     row.querySelector('.fItem').addEventListener('blur', function () {
       this.value = titleCase(this.value.trim());
       checkItemVariants(row);
       calcTotal();
-      collapseItemRow(row);
+      scheduleRowCollapse_(row);
     });
     row.querySelector('.item-row-summary').addEventListener('click', function () { expandItemRow(row); });
 
@@ -859,6 +874,17 @@
   // Once an item's description, qty and price are all filled in, fold it
   // down to a one-line summary so a multi-item order doesn't turn into
   // endless scrolling — tap the summary to reopen and edit it.
+  // A blur fires the instant focus leaves a field, even when it's only
+  // moving to the next field in the SAME row (Description -> Qty -> Price).
+  // Collapsing immediately on every blur would hide the very field the user
+  // just clicked into before the click could land. Deferring one tick lets
+  // focus actually settle, so we only collapse once it's truly left the row.
+  function scheduleRowCollapse_(row) {
+    setTimeout(function () {
+      if (!row.contains(document.activeElement)) collapseItemRow(row);
+    }, 0);
+  }
+
   function collapseItemRow(row) {
     var itemEl = row.querySelector('.fItem');
     var qtyEl = row.querySelector('.fQty');
@@ -954,9 +980,28 @@
 
   function removeItemRow(id) {
     var container = document.getElementById('itemsContainer');
-    if (container.children.length <= 1) return;
     var row = container.querySelector('[data-row-id="' + id + '"]');
-    if (row) row.remove();
+    if (!row) return;
+
+    // An order always needs at least one item row, so the very last one
+    // can't be deleted outright — but doing nothing looked exactly like a
+    // broken button. Clear it back to blank/editable instead, which is
+    // visibly "removed" from the user's point of view.
+    if (container.children.length <= 1) {
+      row.classList.remove('row-error', 'row-shake');
+      row.dataset.cost = '';
+      row.querySelector('.fItem').value = '';
+      row.querySelector('.fQty').value = '';
+      row.querySelector('.fPrice').value = '';
+      var pillsWrap = row.querySelector('.item-variant-pills');
+      pillsWrap.innerHTML = '';
+      pillsWrap.style.display = 'none';
+      expandItemRow(row);
+      calcTotal();
+      return;
+    }
+
+    row.remove();
     renumberItemRows();
     calcTotal();
   }
@@ -1528,6 +1573,7 @@
     document.getElementById('coDepositWrap').style.display = 'block';
     document.getElementById('coDepositLink').style.display = 'none';
     document.getElementById('coDeposit').focus();
+    updatePayStatusLabel_();
   }
 
   function hideDepositOption(e) {
@@ -1536,6 +1582,18 @@
     document.getElementById('coDepositWrap').style.display = 'none';
     document.getElementById('coDeposit').value = '';
     document.getElementById('coDepositLink').style.display = 'inline-block';
+    updatePayStatusLabel_();
+  }
+
+  // The "Payment status" caption was a static "Paid in full" that never
+  // changed even after switching into deposit mode — looked like the box
+  // was lying about what was about to be submitted. Now it always reflects
+  // exactly what handlePaidSubmit will actually send.
+  function updatePayStatusLabel_() {
+    var label = document.getElementById('coPayStatusLabel');
+    if (!isDepositMode) { label.textContent = 'Paid in full'; return; }
+    var dep = parseFloat(document.getElementById('coDeposit').value);
+    label.textContent = 'Partial deposit — £' + (isNaN(dep) ? '0.00' : dep.toFixed(2));
   }
 
   function onCoSourceType(val) {
