@@ -331,12 +331,18 @@
       </div>
       <div class="co-field">
         <label>Payment status</label>
-        <div style="font-size:14px;color:#555;padding:4px 0 2px" id="coPayStatusLabel">Paid in full</div>
-        <a href="#" class="deposit-link" id="coDepositLink" onclick="showDepositOption(event)">Received a deposit instead?</a>
+        <div class="co-pay-row">
+          <input class="co-pay-radio" type="radio" name="coPayStatus" id="coPS1" value="full" checked onchange="setPayStatusMode_('full')">
+          <label class="co-pay-pill" for="coPS1">Paid in full</label>
+          <input class="co-pay-radio" type="radio" name="coPayStatus" id="coPS2" value="deposit" onchange="setPayStatusMode_('deposit')">
+          <label class="co-pay-pill" for="coPS2">Deposit paid</label>
+          <input class="co-pay-radio" type="radio" name="coPayStatus" id="coPS3" value="cod" onchange="setPayStatusMode_('cod')">
+          <label class="co-pay-pill" for="coPS3">Pay on delivery</label>
+        </div>
         <div id="coDepositWrap" style="display:none;margin-top:10px;">
           <input class="co-builder-input" type="number" id="coDeposit" placeholder="Deposit amount e.g. 50.00" step="0.01" min="0" inputmode="decimal" oninput="updatePayStatusLabel_()">
-          <a href="#" class="deposit-link" id="coDepositCancelLink" onclick="hideDepositOption(event)" style="display:block;margin-top:6px">Actually, paid in full</a>
         </div>
+        <div id="coPayStatusLabel" style="font-size:12px;color:#888;margin-top:8px"></div>
       </div>
       <div class="co-field">
         <label>Discount £ <span style="color:#999;font-weight:400">(optional)</span></label>
@@ -611,6 +617,7 @@
     } else {
       document.getElementById('generateBtn').textContent = 'Submit order & send invoice →';
       if (!coInvoiceNum) loadCoInvoiceNumber();
+      updatePayStatusLabel_();
       calcTotal();
     }
   }
@@ -744,7 +751,7 @@
         (o.isDraft ? '' : '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>') +
         '<div class="pending-item-actions">' +
           '<button type="button" class="pending-mini-btn new-order-btn">New Order</button>' +
-          (o.isDraft ? '<button type="button" class="pending-mini-btn mark-paid-btn">Mark Paid</button>' : '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>') +
+          (o.isDraft ? '<button type="button" class="pending-mini-btn mark-paid-btn">Convert to Order</button>' : '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>') +
         '</div>';
       row.querySelector('.new-order-btn').addEventListener('click', function () {
         startNewOrderFromSearch_(o);
@@ -1180,7 +1187,7 @@
         '<div class="pending-item-meta">' + escapeHtml_(inv.ref) + (dateStr ? ' · ' + dateStr : '') + '</div>' +
         '<div class="pending-item-actions">' +
           '<button type="button" class="pending-mini-btn edit-draft-btn">Edit</button>' +
-          '<button type="button" class="pending-mini-btn mark-paid-btn">Mark Paid</button>' +
+          '<button type="button" class="pending-mini-btn mark-paid-btn">Convert to Order</button>' +
         '</div>';
 
       row.querySelector('.pending-del-btn').addEventListener('click', function () {
@@ -1269,7 +1276,10 @@
     setMode('paid');
     document.getElementById('fCompany').value = inv.company || '';
     document.getElementById('fEmail').value = inv.email || '';
-    hideDepositOption(); // "Paid in full" — this is a paid draft being closed out
+    // Defaults to "Paid in full" (the common case for closing out a draft),
+    // but it's just the default pill selection — switch to "Deposit paid" or
+    // "Pay on delivery" below if this one hasn't actually been paid yet.
+    resetPayStatus_();
 
     // Every item on the draft gets its own row, full stop — what was quoted
     // is what must carry over. This used to only add rows for items that
@@ -1571,38 +1581,47 @@
     document.body.appendChild(script);
   }
 
-  // Paid mode implies "Paid in full" by default — no visible status choice
-  // needed. This link is the one, deliberately buried, way to record a
-  // deposit instead for the rare case that isn't a full payment.
-  var isDepositMode = false;
+  // Payment status is an explicit 3-way choice: Paid in full / Deposit paid /
+  // Pay on delivery. "Pay on delivery" exists because a real order (a table
+  // talker for a barber shop, paid cash on collection) was submitted with no
+  // way to say "confirmed, not paid yet" — the only options were a full order
+  // that silently claimed PAID on the customer's invoice, or a Draft that
+  // would never forward to Tagify for production. All three still forward to
+  // Tagify (production must start regardless of payment timing); only the
+  // wording on the customer-facing invoice differs.
+  var payStatusMode = 'full'; // 'full' | 'deposit' | 'cod'
 
-  function showDepositOption(e) {
-    if (e) e.preventDefault();
-    isDepositMode = true;
-    document.getElementById('coDepositWrap').style.display = 'block';
-    document.getElementById('coDepositLink').style.display = 'none';
-    document.getElementById('coDeposit').focus();
+  function setPayStatusMode_(mode) {
+    payStatusMode = mode;
+    document.getElementById('coDepositWrap').style.display = (mode === 'deposit') ? 'block' : 'none';
+    if (mode === 'deposit') document.getElementById('coDeposit').focus();
     updatePayStatusLabel_();
   }
 
-  function hideDepositOption(e) {
-    if (e) e.preventDefault();
-    isDepositMode = false;
+  function resetPayStatus_() {
+    payStatusMode = 'full';
+    document.getElementById('coPS1').checked = true;
     document.getElementById('coDepositWrap').style.display = 'none';
     document.getElementById('coDeposit').value = '';
-    document.getElementById('coDepositLink').style.display = 'inline-block';
     updatePayStatusLabel_();
   }
 
-  // The "Payment status" caption was a static "Paid in full" that never
-  // changed even after switching into deposit mode — looked like the box
-  // was lying about what was about to be submitted. Now it always reflects
-  // exactly what handlePaidSubmit will actually send.
+  // Spells out exactly what the customer's invoice will say and whether the
+  // order still goes to Tagify — a payment status that silently diverged
+  // from the actual invoice wording is exactly how a real order went out
+  // stamped PAID when nothing had been paid. This is the one place that
+  // truth gets shown back before submit.
   function updatePayStatusLabel_() {
     var label = document.getElementById('coPayStatusLabel');
-    if (!isDepositMode) { label.textContent = 'Paid in full'; return; }
-    var dep = parseFloat(document.getElementById('coDeposit').value);
-    label.textContent = 'Partial deposit — £' + (isNaN(dep) ? '0.00' : dep.toFixed(2));
+    if (payStatusMode === 'full') {
+      label.textContent = 'Invoice will show: PAID.';
+    } else if (payStatusMode === 'deposit') {
+      var dep = parseFloat(document.getElementById('coDeposit').value);
+      var depTxt = isNaN(dep) ? '0.00' : dep.toFixed(2);
+      label.textContent = 'Invoice will show: PAYMENT PENDING — £' + depTxt + ' deposit taken, balance due shown on the invoice.';
+    } else {
+      label.textContent = 'Invoice will show: PAYMENT PENDING — full amount due on delivery. Still forwarded to Tagify for production now.';
+    }
   }
 
   function onCoSourceType(val) {
@@ -1752,8 +1771,15 @@
     btn.disabled = true;
     btn.textContent = 'Sending…';
 
-    var dep = document.getElementById('coDeposit').value;
-    var payStatus = (isDepositMode && dep) ? ('Partial deposit — £' + parseFloat(dep).toFixed(2)) : 'Paid in full';
+    var payStatus, depositAmountVal = 0;
+    if (payStatusMode === 'deposit') {
+      depositAmountVal = parseFloat(document.getElementById('coDeposit').value) || 0;
+      payStatus = 'Partial deposit — £' + depositAmountVal.toFixed(2);
+    } else if (payStatusMode === 'cod') {
+      payStatus = 'Awaiting payment on delivery';
+    } else {
+      payStatus = 'Paid in full';
+    }
 
     // Generate the key on the first attempt; a retry after a failed/timed-out
     // send reuses the same one, so the server can tell it's the same order.
@@ -1773,7 +1799,7 @@
       source:        document.getElementById('coSource').value.trim(),
       notes:         document.getElementById('coNotes').value.trim(),
       discount:      parseFloat(document.getElementById('coDiscount').value) || 0,
-      depositAmount: (isDepositMode && dep) ? parseFloat(dep) || 0 : 0,
+      depositAmount: depositAmountVal,
       orderKey:      currentOrderKey
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
@@ -1834,10 +1860,9 @@
     document.getElementById('coAddress').value = '';
     document.getElementById('coSource').value = '';
     document.getElementById('coNotes').value = '';
-    document.getElementById('coDeposit').value = '';
     document.getElementById('coDiscount').value = '';
     document.querySelectorAll('input[name="coPay"], input[name="coFulfilment"], input[name="coSourceType"]').forEach(function (r) { r.checked = false; });
-    hideDepositOption();
+    resetPayStatus_();
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
     addItemRow();
