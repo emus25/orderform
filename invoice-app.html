@@ -58,6 +58,7 @@
   .item-row.row-error { outline: 2px solid #e53e3e; outline-offset: 6px; border-radius: 8px; }
   .item-variant-pills-hint { display: none; color: #e53e3e; font-size: 12px; font-weight: 600; margin: -6px 0 8px; }
   .item-row.row-error .item-variant-pills-hint { display: block; }
+  .item-custom-note { display: none; color: #999; font-size: 12px; margin: -6px 0 8px; }
   @keyframes rowShake {
     10%, 90% { transform: translateX(-1px); }
     20%, 80% { transform: translateX(2px); }
@@ -750,9 +751,14 @@
         '<div class="pending-item-meta">' + idLabel + (dateStr ? ' · ' + dateStr : '') + (o.paymentStatus ? ' · ' + escapeHtml_(o.paymentStatus) : '') + '</div>' +
         (o.isDraft ? '' : '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>') +
         '<div class="pending-item-actions">' +
+          '<button type="button" class="pending-mini-btn view-order-btn">View Order</button>' +
           '<button type="button" class="pending-mini-btn new-order-btn">New Order</button>' +
           (o.isDraft ? '<button type="button" class="pending-mini-btn mark-paid-btn">Convert to Order</button>' : '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>') +
-        '</div>';
+        '</div>' +
+        '<div class="order-detail" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0ee;font-size:13px;color:#555;line-height:1.6"></div>';
+      row.querySelector('.view-order-btn').addEventListener('click', function () {
+        toggleOrderDetail_(row, o);
+      });
       row.querySelector('.new-order-btn').addEventListener('click', function () {
         startNewOrderFromSearch_(o);
       });
@@ -771,6 +777,32 @@
       resultsEl.appendChild(row);
       if (!o.isDraft) showTagifyBadge(badgeId, o.tagifyStatus, o.invoiceNumber);
     });
+  }
+
+  // "View Order" — expands the exact order details already returned by the
+  // search (items, contact info) inline, no extra request needed. Toggles
+  // shut on a second click rather than opening a separate screen.
+  function toggleOrderDetail_(row, o) {
+    var box = row.querySelector('.order-detail');
+    if (box.style.display === 'block') { box.style.display = 'none'; return; }
+
+    // Real orders return "items" as the formatted string already; drafts
+    // return "items" as the structured array (needed for Convert to Order)
+    // plus a separate "itemsStr" for display — use whichever is the string.
+    var itemsDisplayStr = o.isDraft ? (o.itemsStr || '') : (o.items || '');
+    var itemLines = itemsDisplayStr.split('|').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+
+    var fields = [];
+    if (o.contact) fields.push(['Contact', o.contact]);
+    if (o.email) fields.push(['Email', o.email]);
+    if (o.phone) fields.push(['Phone', o.phone]);
+    if (o.address) fields.push(['Address', o.address]);
+
+    box.innerHTML =
+      (itemLines.length ? '<div style="margin-bottom:6px">' + itemLines.map(escapeHtml_).join('<br>') + '</div>' : '') +
+      fields.map(function (f) { return '<div><b>' + f[0] + ':</b> ' + escapeHtml_(f[1]) + '</div>'; }).join('');
+
+    box.style.display = 'block';
   }
 
   // "New Order" on a search result: starts a fresh Draft or Paid form
@@ -855,6 +887,7 @@
       '<div class="item-row-body">' +
         '<div class="field"><label>Description</label><input type="text" class="fItem" list="catalogDatalist"></div>' +
         '<div class="item-variant-pills-hint">Please choose — Printed or Engraved (and colour):</div>' +
+        '<div class="item-custom-note">No catalog match — this will go through as a custom item.</div>' +
         '<div class="item-variant-pills"></div>' +
         '<div class="row2">' +
           '<div class="field"><label>Qty</label><input type="number" class="fQty" min="0" step="1"></div>' +
@@ -913,9 +946,9 @@
     // Never fold away a still-unresolved variant choice (Printed vs
     // Engraved, or which colour) — the whole point of showing the pills is
     // so that choice can't be silently skipped by the row looking "done".
-    var split = splitCatalogSuffix_(item);
-    var catalogData = CATALOG_LOOKUP[split.baseName.toLowerCase()];
-    if (catalogData && catalogData.variants && catalogData.variants.length > 1 && !split.suffix) return;
+    // Unresolved includes a typo'd/made-up suffix, not just an empty one.
+    var vm = matchCatalogVariant_(item);
+    if (vm.data && vm.data.variants && vm.data.variants.length > 1 && !vm.matchedLabel) return;
 
     var summary = row.querySelector('.item-row-summary');
     summary.innerHTML =
@@ -932,58 +965,132 @@
   }
 
   // Splits "Product – suffix" into its base name and variant suffix.
-  // Recognises a plain hyphen (" - "), en dash (" – ", e.g. the BNI Draft
-  // Invoice button's "Digital Member Name Badges – BNI A380"), or em dash
-  // (" — ", the format variant pills write and INPERSON_TAGIFY's lookup
-  // keys expect) as the separator — all three are one character between two
-  // spaces, so the same +3 offset works for any of them. Shared by every
-  // place that needs to match a typed/stored item name against the catalog.
+  // Recognises whatever punctuation someone naturally types as a separator —
+  // hyphen/en dash/em dash, a colon ("Product: Variant"), or a slash with
+  // spaces around it ("Product / Variant") — not just the exact em dash the
+  // variant pills themselves write. A slash with NO surrounding spaces is
+  // deliberately NOT treated as a separator: "£1/year Hosting Fee" is a real
+  // catalog product name and must never be split on that slash. This is a
+  // recurring failure mode — "White Brushed Metal Card : Printed" once fell
+  // through unrecognised on both the frontend and the Tagify forward, even
+  // though the exact product/variant was a real, correctly-mapped match —
+  // so this list should stay generous rather than exact. Match length varies
+  // per separator, so the split uses the actual matched length rather than
+  // assuming a fixed offset. Shared by every place that needs to match a
+  // typed/stored item name against the catalog.
   function splitCatalogSuffix_(raw) {
-    var sepMatch = raw.match(/ [-–—] /);
-    var sep = sepMatch ? sepMatch.index : -1;
+    var sepMatch = raw.match(/\s+[-–—]\s+|\s*:\s*|\s+\/\s+|\s*\|\s*/);
     return {
-      baseName: (sep === -1 ? raw : raw.slice(0, sep)).trim(),
-      suffix: sep === -1 ? '' : raw.slice(sep + 3).trim()
+      baseName: (sepMatch ? raw.slice(0, sepMatch.index) : raw).trim(),
+      suffix: sepMatch ? raw.slice(sepMatch.index + sepMatch[0].length).trim() : ''
     };
+  }
+
+  // Single source of truth for "is this a real catalog product, and has its
+  // suffix actually resolved to one of its real variants" — any separator,
+  // any case. A suffix that doesn't match a real variant (a typo, made-up
+  // text) counts as unresolved, same as typing nothing — it must be an exact
+  // match, not "something was typed after a dash". Used to decide whether to
+  // block submission, what the pills highlight, and — critically — the exact
+  // name that actually gets sent to Tagify/the sheet/the PDF, so the form
+  // itself only ever produces the one canonical format instead of every
+  // downstream consumer having to tolerate every way someone might type it.
+  function matchCatalogVariant_(raw) {
+    var split = splitCatalogSuffix_(raw);
+    var data = CATALOG_LOOKUP[split.baseName.toLowerCase()];
+    var result = { baseName: split.baseName, data: data, variantDefs: [], matchedLabel: null, overridePrice: null, typedSuffix: split.suffix };
+    if (!data || !data.variants || !data.variants.length) return result;
+
+    result.variantDefs = data.variants.map(function (v) {
+      var m = v.match(/^(.*) — £([\d.]+)$/);
+      return { label: m ? m[1] : v, overridePrice: m ? parseFloat(m[2]) : null };
+    });
+
+    if (split.suffix) {
+      for (var i = 0; i < result.variantDefs.length; i++) {
+        if (result.variantDefs[i].label.toLowerCase() === split.suffix.toLowerCase()) {
+          result.matchedLabel = result.variantDefs[i].label;
+          result.overridePrice = result.variantDefs[i].overridePrice;
+          break;
+        }
+      }
+    }
+    return result;
   }
 
   // If the typed description (before any " - Variant" suffix) matches a real
   // catalog product, silently attach its cost to the row (for profit
   // tracking) and offer its variants as quick-pick pills. Genuinely custom
-  // text just doesn't match anything — cost stays 0, no pills, exactly like
-  // typing a custom item always worked.
+  // text just doesn't match anything — cost stays 0, no pills, allowed
+  // straight through (hosting fees, BNI badges, etc. deliberately have no
+  // Tagify equivalent and never should) — but flagged with a quiet note so
+  // it's a visible, deliberate outcome rather than a silent one. A typed
+  // variant suffix that doesn't match any real option, on a product that DID
+  // match, is different: that's an active mistake, not a custom item, so it
+  // gets an immediate red message right here rather than waiting until the
+  // submit-time shake to discover it.
   function checkItemVariants(row) {
     var itemEl = row.querySelector('.fItem');
     var qtyEl = row.querySelector('.fQty');
     var priceEl = row.querySelector('.fPrice');
     var wrap = row.querySelector('.item-variant-pills');
+    var hintEl = row.querySelector('.item-variant-pills-hint');
+    var noteEl = row.querySelector('.item-custom-note');
     var raw = itemEl.value.trim();
-    var split = splitCatalogSuffix_(raw);
-    var baseName = split.baseName;
-    var activeSuffix = split.suffix;
-    var data = CATALOG_LOOKUP[baseName.toLowerCase()];
+    var m = matchCatalogVariant_(raw);
+    var baseName = m.baseName;
+    var data = m.data;
 
     wrap.innerHTML = '';
-    if (!data) { wrap.style.display = 'none'; row.dataset.cost = ''; return; }
+
+    if (!data) {
+      wrap.style.display = 'none';
+      row.dataset.cost = '';
+      row.classList.remove('row-error');
+      noteEl.style.display = raw ? 'block' : 'none';
+      return;
+    }
+    noteEl.style.display = 'none';
 
     row.dataset.cost = data.cost;
     if (!qtyEl.value) qtyEl.value = 1;
     if (!priceEl.value) priceEl.value = data.price.toFixed(2);
 
-    if (!data.variants || !data.variants.length) { wrap.style.display = 'none'; return; }
+    if (!data.variants || !data.variants.length) { wrap.style.display = 'none'; row.classList.remove('row-error'); return; }
+
+    var labelList = m.variantDefs.map(function (d) { return d.label; }).join(', ');
+
+    // Whatever punctuation or case was actually typed ("Card : printed",
+    // "Card / PRINTED"), once it resolves to a real variant, rewrite the
+    // field to the exact canonical "Base — Suffix" form right here so it's
+    // visible immediately, not just silently fixed at submit time.
+    var activeLabel = m.matchedLabel;
+    if (activeLabel) {
+      var canonical = baseName + ' — ' + activeLabel;
+      if (raw !== canonical) itemEl.value = canonical;
+      if (m.overridePrice != null) priceEl.value = m.overridePrice.toFixed(2);
+      row.classList.remove('row-error');
+    } else if (m.typedSuffix) {
+      // Something was typed but it isn't one of the real options — an
+      // active mistake, flagged the instant the field is left, not just
+      // when submit is attempted.
+      hintEl.textContent = '"' + m.typedSuffix + '" isn’t a valid option — please pick one below: ' + labelList;
+      row.classList.add('row-error');
+    } else {
+      // Nothing typed yet — neutral, not an error, just still needs a pick.
+      hintEl.textContent = 'Please choose one: ' + labelList;
+      row.classList.remove('row-error');
+    }
 
     wrap.style.display = 'flex';
-    data.variants.forEach(function (v) {
-      var m = v.match(/^(.*) — £([\d.]+)$/);
-      var label = m ? m[1] : v;
-      var overridePrice = m ? parseFloat(m[2]) : null;
+    m.variantDefs.forEach(function (def) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'variant-pill-btn' + (label === activeSuffix ? ' active' : '');
-      btn.textContent = label;
+      btn.className = 'variant-pill-btn' + (def.label === activeLabel ? ' active' : '');
+      btn.textContent = def.label;
       btn.addEventListener('click', function () {
-        itemEl.value = baseName + ' — ' + label;
-        if (overridePrice != null) priceEl.value = overridePrice.toFixed(2);
+        itemEl.value = baseName + ' — ' + def.label;
+        if (def.overridePrice != null) priceEl.value = def.overridePrice.toFixed(2);
         wrap.querySelectorAll('.variant-pill-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         row.classList.remove('row-error');
@@ -1044,9 +1151,10 @@
     for (var i = 0; i < rows.length; i++) {
       var name = rows[i].querySelector('.fItem').value.trim();
       if (!name) continue;
-      var split = splitCatalogSuffix_(name);
-      var data = CATALOG_LOOKUP[split.baseName.toLowerCase()];
-      if (data && data.variants && data.variants.length > 1 && !split.suffix) {
+      var m = matchCatalogVariant_(name);
+      // Not just "nothing typed" — a typo or made-up suffix that doesn't
+      // match any real variant counts as unresolved too, same block.
+      if (m.data && m.data.variants && m.data.variants.length > 1 && !m.matchedLabel) {
         return rows[i];
       }
     }
@@ -1068,16 +1176,24 @@
 
   function buildBasketFromRows() {
     return getItemRows().map(function (row) {
-      var name = row.querySelector('.fItem').value.trim();
+      var raw = row.querySelector('.fItem').value.trim();
+      var name = raw;
 
-      // Only auto-completes when there's exactly one possible variant —
-      // nothing to actually decide, so it's not a guess. Anything with a
-      // real choice (2+ variants) is caught by findMissingVariantRow_
-      // above and blocks submission instead of being silently picked.
-      var split = splitCatalogSuffix_(name);
-      var data = CATALOG_LOOKUP[split.baseName.toLowerCase()];
-      if (data && data.variants && data.variants.length === 1 && !split.suffix) {
-        name = split.baseName + ' — ' + data.variants[0];
+      // Final safety net right before submission: whatever's actually going
+      // to Tagify/the sheet/the PDF is always rebuilt from the matched real
+      // variant, never the raw typed text — this should already be canonical
+      // from checkItemVariants running on blur, but this guarantees it even
+      // if a row was never blurred. A real choice with 2+ variants that
+      // still isn't resolved is caught by findMissingVariantRow_ above and
+      // blocks submission before this ever runs; a single-variant product
+      // auto-completes since there's nothing to actually decide.
+      var m = matchCatalogVariant_(raw);
+      if (m.data && m.data.variants && m.data.variants.length) {
+        if (m.matchedLabel) {
+          name = m.baseName + ' — ' + m.matchedLabel;
+        } else if (m.data.variants.length === 1) {
+          name = m.baseName + ' — ' + m.variantDefs[0].label;
+        }
       }
 
       return {
