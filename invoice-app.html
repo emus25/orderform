@@ -752,12 +752,16 @@
         (o.isDraft ? '' : '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>') +
         '<div class="pending-item-actions">' +
           '<button type="button" class="pending-mini-btn view-order-btn">View Order</button>' +
+          '<button type="button" class="pending-mini-btn view-pdf-btn">View PDF</button>' +
           '<button type="button" class="pending-mini-btn new-order-btn">New Order</button>' +
           (o.isDraft ? '<button type="button" class="pending-mini-btn mark-paid-btn">Convert to Order</button>' : '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>') +
         '</div>' +
         '<div class="order-detail" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0ee;font-size:13px;color:#555;line-height:1.6"></div>';
       row.querySelector('.view-order-btn').addEventListener('click', function () {
         toggleOrderDetail_(row, o);
+      });
+      row.querySelector('.view-pdf-btn').addEventListener('click', function (e) {
+        viewOrderPdf_(o, e.currentTarget);
       });
       row.querySelector('.new-order-btn').addEventListener('click', function () {
         startNewOrderFromSearch_(o);
@@ -803,6 +807,53 @@
       fields.map(function (f) { return '<div><b>' + f[0] + ':</b> ' + escapeHtml_(f[1]) + '</div>'; }).join('');
 
     box.style.display = 'block';
+  }
+
+  // "View PDF" on a search result. Drafts already have a saved Drive link
+  // (created when the draft itself was made) — just open it. Real orders
+  // never had their PDF saved anywhere (only ever handed to the browser once,
+  // at submit time), so it's rebuilt on demand from the order's stored data.
+  function viewOrderPdf_(o, btn) {
+    if (o.isDraft) {
+      if (!o.pdfLink) { showError('No PDF found for this draft yet.'); return; }
+      window.open(o.pdfLink, '_blank');
+      return;
+    }
+
+    // Opened synchronously, in direct response to the click, then pointed at
+    // the real PDF once it's ready — opening a tab only after the fetch
+    // resolves gets blocked as a popup by most browsers, since by then it's
+    // no longer a direct result of the user's click.
+    var newTab = window.open('', '_blank');
+    if (newTab && newTab.document) newTab.document.write('Loading PDF…');
+
+    var originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'regenerateOrderPdf', password: getPassword(), invoiceNumber: o.invoiceNumber })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); if (newTab) newTab.close(); return; }
+        if (data.status !== 'success' || !data.pdfBase64) {
+          showError(data.message || 'Could not load the PDF.');
+          if (newTab) newTab.close();
+          return;
+        }
+        var url = URL.createObjectURL(base64ToBlob(data.pdfBase64, 'application/pdf'));
+        if (newTab && !newTab.closed) { newTab.location.href = url; } else { window.open(url, '_blank'); }
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        showError('Could not load the PDF — please try again.');
+        if (newTab) newTab.close();
+      });
   }
 
   // "New Order" on a search result: starts a fresh Draft or Paid form
