@@ -320,13 +320,15 @@
       <div class="co-group-label">Payment</div>
       <div class="co-field">
         <div class="co-pay-row">
-          <input class="co-pay-radio" type="radio" name="coPay" id="coPm1" value="Monzo transfer">
+          <input class="co-pay-radio" type="radio" name="coPay" id="coPm1" value="Monzo transfer" onchange="calcTotal()">
           <label class="co-pay-pill" for="coPm1">Monzo</label>
           <input class="co-pay-radio" type="radio" name="coPay" id="coPm2" value="Lopay card" onchange="calcTotal()">
-          <label class="co-pay-pill" for="coPm2">Lopay</label>
-          <input class="co-pay-radio" type="radio" name="coPay" id="coPm3" value="Cash">
+          <label class="co-pay-pill" for="coPm2">Lopay Card</label>
+          <input class="co-pay-radio" type="radio" name="coPay" id="coPm5" value="Lopay Link" onchange="calcTotal()">
+          <label class="co-pay-pill" for="coPm5">Lopay Link</label>
+          <input class="co-pay-radio" type="radio" name="coPay" id="coPm3" value="Cash" onchange="calcTotal()">
           <label class="co-pay-pill" for="coPm3">Cash</label>
-          <input class="co-pay-radio" type="radio" name="coPay" id="coPm4" value="Stripe">
+          <input class="co-pay-radio" type="radio" name="coPay" id="coPm4" value="Stripe" onchange="calcTotal()">
           <label class="co-pay-pill" for="coPm4">Stripe</label>
         </div>
       </div>
@@ -1279,15 +1281,20 @@
       if (discount > grossTotal) discount = grossTotal;
       var total = grossTotal - discount;
 
+      // Lopay Link carries an extra 0.49% on top of the standard card rate —
+      // same fixed £0.08, just a higher percentage since it's a payment link
+      // rather than a card-present transaction.
       var pay = document.querySelector('input[name="coPay"]:checked');
-      var isLopay = pay && pay.value === 'Lopay card';
-      var fee = isLopay ? total * 0.0099 + 0.08 : 0;
+      var isLopayCard = pay && pay.value === 'Lopay card';
+      var isLopayLink = pay && pay.value === 'Lopay Link';
+      var lopayRate = isLopayLink ? 0.0148 : (isLopayCard ? 0.0099 : 0);
+      var fee = (isLopayCard || isLopayLink) ? total * lopayRate + 0.08 : 0;
       var net = total - fee;
       document.getElementById('coTotalVal').textContent = '£' + total.toFixed(2);
       var feeLine = document.getElementById('coFeeLine');
       var feeLineText = '';
       if (discount > 0) feeLineText += 'Discount −£' + discount.toFixed(2) + ' applied. ';
-      if (isLopay && fee > 0) feeLineText += 'Lopay fee −£' + fee.toFixed(2) + ' → you keep £' + net.toFixed(2);
+      if ((isLopayCard || isLopayLink) && fee > 0) feeLineText += 'Lopay fee −£' + fee.toFixed(2) + ' → you keep £' + net.toFixed(2);
       if (feeLineText) {
         feeLine.textContent = feeLineText;
         feeLine.style.display = 'block';
