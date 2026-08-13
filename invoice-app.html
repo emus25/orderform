@@ -314,11 +314,15 @@
 
     <!-- Draft-only payment link -->
     <div class="card" id="payLinkCard">
-      <div class="field">
-        <label>Custom payment link (optional)</label>
-        <input type="text" id="fPayLink">
+      <div class="field" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <input type="checkbox" id="fIncludeLink" checked onchange="onIncludeLinkChange()" style="width:16px;height:16px;margin:0">
+        <label style="margin:0" for="fIncludeLink">Include link</label>
       </div>
-      <div style="font-size:12px;color:#999;margin-top:10px;line-height:1.5">Drafts are always sent as proformas — no real invoice number yet. Switch to "Paid" above once money's actually landed.</div>
+      <div class="field" id="fPayLinkWrap">
+        <label>Custom payment link (optional)</label>
+        <input type="text" id="fPayLink" placeholder="Defaults to Monzo if left blank">
+      </div>
+      <div style="font-size:12px;color:#999;margin-top:10px;line-height:1.5" id="payLinkNote">Drafts are always sent as proformas — no real invoice number yet. Switch to "Paid" above once money's actually landed.</div>
     </div>
 
     <!-- Paid-only payment/fulfilment/notes -->
@@ -598,6 +602,18 @@
   // list are shared between both; only the extra paid-specific fields and
   // the submit action change.
   var invoiceMode = 'draft';
+
+  // Unticking "Include link" means bank transfer becomes the ONLY way to pay
+  // shown on the invoice — no Monzo default, no custom link either. Hides
+  // the (now irrelevant) custom-link input and makes the consequence explicit
+  // right there, rather than a silent behaviour change.
+  function onIncludeLinkChange() {
+    var checked = document.getElementById('fIncludeLink').checked;
+    document.getElementById('fPayLinkWrap').style.display = checked ? 'block' : 'none';
+    document.getElementById('payLinkNote').textContent = checked
+      ? 'Drafts are always sent as proformas — no real invoice number yet. Switch to "Paid" above once money\'s actually landed.'
+      : 'No payment link will be included on this invoice — bank transfer will be the only way to pay.';
+  }
 
   function setMode(m) {
     invoiceMode = m;
@@ -1425,6 +1441,8 @@
     document.getElementById('fCompany').value = inv.company || '';
     document.getElementById('fEmail').value = inv.email || '';
     document.getElementById('fPayLink').value = '';
+    document.getElementById('fIncludeLink').checked = true;
+    onIncludeLinkChange();
     document.getElementById('coDiscount').value = inv.discount ? inv.discount : '';
 
     document.getElementById('itemsContainer').innerHTML = '';
@@ -1523,6 +1541,8 @@
     document.getElementById('fCompany').value = chapterName;
     document.getElementById('fEmail').value = '';
     document.getElementById('fPayLink').value = '';
+    document.getElementById('fIncludeLink').checked = true;
+    onIncludeLinkChange();
 
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
@@ -1630,8 +1650,9 @@
       company:   company,
       email:     document.getElementById('fEmail').value.trim(),
       items:     items,
-      payLink:   document.getElementById('fPayLink').value.trim(),
-      discount:  parseFloat(document.getElementById('coDiscount').value) || 0
+      payLink:     document.getElementById('fPayLink').value.trim(),
+      includeLink: document.getElementById('fIncludeLink').checked,
+      discount:    parseFloat(document.getElementById('coDiscount').value) || 0
     };
     if (isEdit) payload.ref = editingDraftRef;
     if (pendingBniChapter) payload.bniChapter = pendingBniChapter;
@@ -1718,6 +1739,8 @@
     document.getElementById('fCompany').value = '';
     document.getElementById('fEmail').value = '';
     document.getElementById('fPayLink').value = '';
+    document.getElementById('fIncludeLink').checked = true;
+    onIncludeLinkChange();
     document.getElementById('coDiscount').value = '';
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
