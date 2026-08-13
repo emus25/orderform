@@ -300,6 +300,12 @@
 
       <button type="button" class="add-item-btn" onclick="addItemRow()">+ Add another item</button>
 
+      <!-- Shared between Draft and Paid — same field, same total either way. -->
+      <div class="field" style="padding:10px 16px 0">
+        <label>Discount £ <span style="color:#999;font-weight:400">(optional)</span></label>
+        <input class="co-builder-input" type="number" id="coDiscount" placeholder="e.g. 20" step="0.01" min="0" inputmode="decimal" oninput="calcTotal()">
+      </div>
+
       <div class="total-preview" id="totalPreviewCard">
         <span>Total</span>
         <span id="totalPreview">£0.00</span>
@@ -346,10 +352,6 @@
           <input class="co-builder-input" type="number" id="coDeposit" placeholder="Deposit amount e.g. 50.00" step="0.01" min="0" inputmode="decimal" oninput="updatePayStatusLabel_()">
         </div>
         <div id="coPayStatusLabel" style="font-size:12px;color:#888;margin-top:8px"></div>
-      </div>
-      <div class="co-field">
-        <label>Discount £ <span style="color:#999;font-weight:400">(optional)</span></label>
-        <input class="co-builder-input" type="number" id="coDiscount" placeholder="e.g. 20" step="0.01" min="0" inputmode="decimal" oninput="calcTotal()">
       </div>
       <div class="co-field">
         <label>Fulfilment</label>
@@ -776,7 +778,7 @@
         // just reachable straight from search, no scrolling/tab-switching
         // needed to find the same draft again.
         row.querySelector('.mark-paid-btn').addEventListener('click', function () {
-          startConvertDraft({ ref: o.draftRef, company: o.company, email: o.email, items: o.items });
+          startConvertDraft({ ref: o.draftRef, company: o.company, email: o.email, items: o.items, discount: o.discount });
         });
       } else {
         row.querySelector('.retry-order-btn').addEventListener('click', function () {
@@ -1305,7 +1307,11 @@
         feeLine.style.display = 'none';
       }
     } else {
-      document.getElementById('totalPreview').textContent = '£' + grossTotal.toFixed(2);
+      var draftDiscountEl = document.getElementById('coDiscount');
+      var draftDiscount = draftDiscountEl ? (parseFloat(draftDiscountEl.value) || 0) : 0;
+      if (draftDiscount < 0) draftDiscount = 0;
+      if (draftDiscount > grossTotal) draftDiscount = grossTotal;
+      document.getElementById('totalPreview').textContent = '£' + (grossTotal - draftDiscount).toFixed(2);
     }
   }
 
@@ -1419,6 +1425,7 @@
     document.getElementById('fCompany').value = inv.company || '';
     document.getElementById('fEmail').value = inv.email || '';
     document.getElementById('fPayLink').value = '';
+    document.getElementById('coDiscount').value = inv.discount ? inv.discount : '';
 
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
@@ -1457,6 +1464,10 @@
     // but it's just the default pill selection — switch to "Deposit paid" or
     // "Pay on delivery" below if this one hasn't actually been paid yet.
     resetPayStatus_();
+    // Discount is the same shared field as Draft mode — set explicitly from
+    // the draft's own discount rather than leaving whatever was already
+    // sitting in the box (which could be stale from an unrelated draft).
+    document.getElementById('coDiscount').value = inv.discount ? inv.discount : '';
 
     // Every item on the draft gets its own row, full stop — what was quoted
     // is what must carry over. This used to only add rows for items that
@@ -1619,7 +1630,8 @@
       company:   company,
       email:     document.getElementById('fEmail').value.trim(),
       items:     items,
-      payLink:   document.getElementById('fPayLink').value.trim()
+      payLink:   document.getElementById('fPayLink').value.trim(),
+      discount:  parseFloat(document.getElementById('coDiscount').value) || 0
     };
     if (isEdit) payload.ref = editingDraftRef;
     if (pendingBniChapter) payload.bniChapter = pendingBniChapter;
@@ -1706,6 +1718,7 @@
     document.getElementById('fCompany').value = '';
     document.getElementById('fEmail').value = '';
     document.getElementById('fPayLink').value = '';
+    document.getElementById('coDiscount').value = '';
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
     addItemRow();
