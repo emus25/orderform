@@ -659,11 +659,12 @@
     el.style.display = 'inline-block';
   }
 
-  function retryTagifyInline(elId, invNum) {
+  function retryTagifyInline(elId, invNum, isWebsite) {
     var el = document.getElementById(elId);
     el.className = 'tagify-badge bad';
     el.innerHTML = 'Retrying…';
-    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'retryTagifyForward', password: getPassword(), invoiceNumber: invNum }) })
+    var action = isWebsite ? 'retryWebsiteTagifyForward' : 'retryTagifyForward';
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: action, password: getPassword(), invoiceNumber: invNum }) })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
@@ -750,11 +751,11 @@
           '<div class="pending-item-name">' + escapeHtml_(o.company) + '</div>' +
           '<div class="pending-item-total">£' + parseFloat(o.total || 0).toFixed(2) + '</div>' +
         '</div>' +
-        '<div class="pending-item-meta">' + idLabel + (dateStr ? ' · ' + dateStr : '') + (o.paymentStatus ? ' · ' + escapeHtml_(o.paymentStatus) : '') + '</div>' +
+        '<div class="pending-item-meta">' + idLabel + (o.isWebsite ? ' · Website' : '') + (dateStr ? ' · ' + dateStr : '') + (o.paymentStatus ? ' · ' + escapeHtml_(o.paymentStatus) : '') + '</div>' +
         (o.isDraft ? '' : '<div class="tagify-badge" id="' + badgeId + '" style="display:none;margin-top:8px"></div>') +
         '<div class="pending-item-actions">' +
           '<button type="button" class="pending-mini-btn view-order-btn">View Order</button>' +
-          '<button type="button" class="pending-mini-btn view-pdf-btn">View PDF</button>' +
+          (o.isWebsite ? '' : '<button type="button" class="pending-mini-btn view-pdf-btn">View PDF</button>') +
           '<button type="button" class="pending-mini-btn new-order-btn">New Order</button>' +
           (o.isDraft ? '<button type="button" class="pending-mini-btn mark-paid-btn">Convert to Order</button>' : '<button type="button" class="pending-mini-btn retry-order-btn">Retry Tagify</button>') +
         '</div>' +
@@ -762,9 +763,11 @@
       row.querySelector('.view-order-btn').addEventListener('click', function () {
         toggleOrderDetail_(row, o);
       });
-      row.querySelector('.view-pdf-btn').addEventListener('click', function (e) {
-        viewOrderPdf_(o, e.currentTarget);
-      });
+      if (!o.isWebsite) {
+        row.querySelector('.view-pdf-btn').addEventListener('click', function (e) {
+          viewOrderPdf_(o, e.currentTarget);
+        });
+      }
       row.querySelector('.new-order-btn').addEventListener('click', function () {
         startNewOrderFromSearch_(o);
       });
@@ -777,7 +780,7 @@
         });
       } else {
         row.querySelector('.retry-order-btn').addEventListener('click', function () {
-          retryTagifyInline(badgeId, o.invoiceNumber);
+          retryTagifyInline(badgeId, o.invoiceNumber, o.isWebsite);
         });
       }
       resultsEl.appendChild(row);
