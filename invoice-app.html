@@ -238,6 +238,7 @@
   <div class="toggle" id="tabToggle">
     <button type="button" id="btnInvoice" class="active" onclick="setTab('invoice')">Invoice</button>
     <button type="button" id="btnBni" onclick="setTab('bni')">BNI Badges</button>
+    <button type="button" id="btnStandalone" onclick="setTab('standalone')">Old Invoice</button>
   </div>
 
   <!-- ══════════ INVOICE (Draft / Paid) ══════════ -->
@@ -302,8 +303,16 @@
 
       <!-- Shared between Draft and Paid — same field, same total either way. -->
       <div class="field" style="padding:10px 16px 0">
-        <label>Discount £ <span style="color:#999;font-weight:400">(optional)</span></label>
-        <input class="co-builder-input" type="number" id="coDiscount" placeholder="e.g. 20" step="0.01" min="0" inputmode="decimal" oninput="calcTotal()">
+        <label>Discount <span style="color:#999;font-weight:400">(optional)</span></label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="co-builder-input" type="number" id="coDiscount" placeholder="e.g. 20" step="0.01" min="0" inputmode="decimal" oninput="calcTotal()" style="flex:1">
+          <div class="co-pay-row" style="flex-shrink:0">
+            <input class="co-pay-radio" type="radio" name="coDiscountUnit" id="coDiscUnitFlat" value="flat" checked onchange="calcTotal()">
+            <label class="co-pay-pill" for="coDiscUnitFlat">£</label>
+            <input class="co-pay-radio" type="radio" name="coDiscountUnit" id="coDiscUnitPct" value="pct" onchange="calcTotal()">
+            <label class="co-pay-pill" for="coDiscUnitPct">%</label>
+          </div>
+        </div>
       </div>
 
       <div class="total-preview" id="totalPreviewCard">
@@ -432,6 +441,53 @@
       </div>
       <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.5">Find this on the chapter's own site — the page literally titled "Member List". Only needed the first time; leave blank when rescanning a chapter already in the list above.</div>
       <button class="generate-btn" id="bniScanBtn" onclick="scanBniChapter()" style="margin-top:14px">Scan chapter</button>
+    </div>
+  </div>
+
+  <!-- ══════════ STANDALONE INVOICE — no order, no sheet row ══════════ -->
+  <div id="standaloneScreen" style="display:none">
+    <div style="font-size:12px;color:#999;margin:0 4px 14px;line-height:1.5">
+      For a customer who paid outside the normal flow (e.g. a while ago, already reflected in the sheet under a different reference) and just needs a copy of an invoice. This never creates an order or touches the sheet — just builds a PDF.
+    </div>
+    <div class="error-msg" id="standaloneErrorMsg"></div>
+
+    <div class="card">
+      <div class="field">
+        <label>Company / customer name</label>
+        <input type="text" id="saCompany">
+      </div>
+      <div class="field">
+        <label>Email <span style="color:#999;font-weight:400">(optional)</span></label>
+        <input type="text" id="saEmail">
+      </div>
+      <div class="field">
+        <label>Invoice number / reference</label>
+        <input type="text" id="saRef" placeholder="e.g. their original invoice number">
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="saDate">
+      </div>
+    </div>
+
+    <div id="standaloneItemsList"></div>
+    <button type="button" class="add-item-btn" onclick="addStandaloneItemRow()">+ Add another item</button>
+
+    <div class="total-preview" id="standaloneTotalCard" style="display:flex">
+      <span>Total</span>
+      <span id="standaloneTotalAmount">£0.00</span>
+    </div>
+
+    <div class="field" style="display:flex;align-items:center;gap:8px;margin:14px 4px">
+      <input type="checkbox" id="saSendEmail" style="width:16px;height:16px;margin:0">
+      <label style="margin:0" for="saSendEmail">Email this to the customer</label>
+    </div>
+
+    <button class="generate-btn" id="saGenerateBtn" onclick="generateStandaloneInvoice()">Generate PDF</button>
+
+    <div id="standaloneResult" style="display:none;margin-top:16px;text-align:center">
+      <p style="font-size:13px;color:#1a7a4c;font-weight:600" id="standaloneResultMsg">PDF ready.</p>
+      <a class="download-btn" id="standaloneDownloadBtn" href="#">Download PDF</a>
     </div>
   </div>
 </div>
@@ -578,7 +634,11 @@
     "Keyring": { price: 60, cost: 12.50, variants: ["Regular", "Slanted"] },
 
     "Digital Member Name Badges": { price: 10, cost: 5.40, variants: [] },
-    "£1/year Hosting Fee": { price: 1, cost: 0, variants: [] }
+    "£1/year Hosting Fee": { price: 1, cost: 0, variants: [] },
+    // Software/access product, not a physical card — no cost, no variant,
+    // and deliberately no INPERSON_TAGIFY mapping in Code.gs, same pattern
+    // as the two items above. Nothing to manufacture, so nothing forwards.
+    "Exposure Boost Pro Plan Lifetime Access": { price: 99, cost: 0, variants: [] }
   };
 
   var CATALOG_NAMES = Object.keys(CATALOG_DATA);
@@ -591,9 +651,121 @@
   function setTab(t) {
     document.getElementById('btnInvoice').classList.toggle('active', t === 'invoice');
     document.getElementById('btnBni').classList.toggle('active', t === 'bni');
+    document.getElementById('btnStandalone').classList.toggle('active', t === 'standalone');
     document.getElementById('invoiceScreen').style.display = (t === 'invoice') ? 'block' : 'none';
     document.getElementById('bniScreen').style.display = (t === 'bni') ? 'block' : 'none';
+    document.getElementById('standaloneScreen').style.display = (t === 'standalone') ? 'block' : 'none';
     if (t === 'bni') loadBniChapters();
+    if (t === 'standalone' && !document.getElementById('standaloneItemsList').children.length) addStandaloneItemRow();
+  }
+
+  /* ═══════════════ STANDALONE INVOICE (no order, no sheet row) ═══════════════ */
+
+  var standaloneItemId = 0;
+
+  function addStandaloneItemRow() {
+    var id = standaloneItemId++;
+    var row = document.createElement('div');
+    row.className = 'card';
+    row.dataset.rowId = id;
+    row.innerHTML =
+      '<div class="item-row-head"><span>Item</span>' +
+        '<button type="button" class="remove-item-btn" onclick="removeStandaloneItemRow(' + id + ')">&times;</button></div>' +
+      '<div class="field"><label>Description</label><input type="text" class="saItem"></div>' +
+      '<div style="display:flex;gap:10px">' +
+        '<div class="field"><label>Qty</label><input type="number" class="saQty" min="0" step="1" value="1"></div>' +
+        '<div class="field"><label>Unit price £</label><input type="number" class="saPrice" min="0" step="0.01"></div>' +
+      '</div>';
+    row.querySelector('.saQty').addEventListener('input', calcStandaloneTotal);
+    row.querySelector('.saPrice').addEventListener('input', calcStandaloneTotal);
+    document.getElementById('standaloneItemsList').appendChild(row);
+  }
+
+  function removeStandaloneItemRow(id) {
+    var list = document.getElementById('standaloneItemsList');
+    var row = list.querySelector('[data-row-id="' + id + '"]');
+    if (!row) return;
+    if (list.children.length === 1) {
+      row.querySelector('.saItem').value = '';
+      row.querySelector('.saQty').value = '1';
+      row.querySelector('.saPrice').value = '';
+    } else {
+      row.remove();
+    }
+    calcStandaloneTotal();
+  }
+
+  function calcStandaloneTotal() {
+    var rows = document.querySelectorAll('#standaloneItemsList > div');
+    var total = 0;
+    rows.forEach(function (row) {
+      var qty = parseFloat(row.querySelector('.saQty').value) || 0;
+      var price = parseFloat(row.querySelector('.saPrice').value) || 0;
+      total += qty * price;
+    });
+    document.getElementById('standaloneTotalAmount').textContent = '£' + total.toFixed(2);
+    return total;
+  }
+
+  function generateStandaloneInvoice() {
+    var errorEl = document.getElementById('standaloneErrorMsg');
+    errorEl.textContent = '';
+
+    var company = document.getElementById('saCompany').value.trim();
+    var ref = document.getElementById('saRef').value.trim();
+    if (!company) { errorEl.textContent = 'Company / customer name is required.'; return; }
+    if (!ref) { errorEl.textContent = 'Invoice number / reference is required.'; return; }
+
+    var rows = document.querySelectorAll('#standaloneItemsList > div');
+    var items = [];
+    rows.forEach(function (row) {
+      var name = row.querySelector('.saItem').value.trim();
+      var qty = parseFloat(row.querySelector('.saQty').value) || 0;
+      var price = parseFloat(row.querySelector('.saPrice').value) || 0;
+      if (name && qty > 0) items.push({ item: name, qty: qty, unitPrice: price });
+    });
+    if (!items.length) { errorEl.textContent = 'Add at least one item.'; return; }
+
+    var email = document.getElementById('saEmail').value.trim();
+    var sendEmail = document.getElementById('saSendEmail').checked;
+    if (sendEmail && !email) { errorEl.textContent = 'Add an email address to send this to the customer.'; return; }
+
+    var btn = document.getElementById('saGenerateBtn');
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'generateStandaloneInvoice', password: getPassword(),
+        company: company, email: email, invoiceNumber: ref,
+        date: document.getElementById('saDate').value || undefined,
+        items: items, sendEmail: sendEmail
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = 'Generate PDF';
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') { errorEl.textContent = data.message || 'Could not generate PDF.'; return; }
+
+        var blob = base64ToBlob(data.pdfBase64, 'application/pdf');
+        var url = URL.createObjectURL(blob);
+        var dl = document.getElementById('standaloneDownloadBtn');
+        dl.href = url;
+        dl.download = 'Invoice ' + ref + '.pdf';
+
+        document.getElementById('standaloneResultMsg').textContent = sendEmail
+          ? (data.emailSent ? 'PDF ready — emailed to ' + email + '.' : 'PDF ready — but the email could not be sent, download and send it manually.')
+          : 'PDF ready.';
+        document.getElementById('standaloneResult').style.display = 'block';
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'Generate PDF';
+        errorEl.textContent = 'Could not generate PDF — check your connection.';
+      });
   }
 
   // Draft = quick quote/proforma, no real invoice number yet, nothing lands
@@ -823,13 +995,63 @@
     if (o.contact) fields.push(['Contact', o.contact]);
     if (o.email) fields.push(['Email', o.email]);
     if (o.phone) fields.push(['Phone', o.phone]);
-    if (o.address) fields.push(['Address', o.address]);
+
+    // Real (non-draft, non-website) orders can have their address added or
+    // corrected here and re-forwarded to Tagify in one step — website orders
+    // get their address from Stripe and use a different retry path, drafts
+    // aren't fulfilled yet, so neither gets the editable field.
+    var canEditAddress = !o.isDraft && !o.isWebsite;
+    if (!canEditAddress && o.address) fields.push(['Address', o.address]);
 
     box.innerHTML =
       (itemLines.length ? '<div style="margin-bottom:6px">' + itemLines.map(escapeHtml_).join('<br>') + '</div>' : '') +
-      fields.map(function (f) { return '<div><b>' + f[0] + ':</b> ' + escapeHtml_(f[1]) + '</div>'; }).join('');
+      fields.map(function (f) { return '<div><b>' + f[0] + ':</b> ' + escapeHtml_(f[1]) + '</div>'; }).join('') +
+      (canEditAddress ?
+        '<div style="margin-top:8px">' +
+          '<label style="display:block;font-size:12px;color:#888;margin-bottom:4px;font-weight:600">Address</label>' +
+          '<textarea class="order-detail-address" rows="2" placeholder="No shipping address on file — add one here" ' +
+            'style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;resize:vertical">' +
+            escapeHtml_(o.address || '') + '</textarea>' +
+          '<button type="button" class="pending-mini-btn save-address-retry-btn" style="margin-top:6px">Save address &amp; retry Tagify</button>' +
+        '</div>'
+      : '');
+
+    if (canEditAddress) {
+      box.querySelector('.save-address-retry-btn').addEventListener('click', function (e) {
+        saveAddressAndRetryTagify_(row, o, box.querySelector('.order-detail-address').value.trim(), e.currentTarget);
+      });
+    }
 
     box.style.display = 'block';
+  }
+
+  // Saves a new/corrected shipping address on an in-person order and
+  // re-forwards it to Tagify in one step — the backend persists the address
+  // to the sheet row itself, not just this one retry attempt.
+  function saveAddressAndRetryTagify_(row, o, address, btn) {
+    if (!address) { alert('Enter an address first.'); return; }
+    var originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Retrying…';
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'retryTagifyForward', password: getPassword(), invoiceNumber: o.invoiceNumber, address: address })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') { alert(data.message || 'Retry failed.'); return; }
+        o.address = address;
+        var badgeEl = row.querySelector('.tagify-badge');
+        if (badgeEl) showTagifyBadge(badgeEl.id, data.tagifyStatus, o.invoiceNumber);
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        alert('Retry failed — check your connection.');
+      });
   }
 
   // "View PDF" on a search result. Drafts already have a saved Drive link
@@ -1287,6 +1509,29 @@
     });
   }
 
+  // Single place both "£" and "%" discount modes get turned into an actual
+  // £ amount — used by the live total preview AND both submit payloads, so
+  // what you see before submitting can never drift from what actually gets
+  // sent (a percentage recomputed slightly differently in two places would
+  // be exactly that kind of silent mismatch).
+  function computeDiscountAmount_(grossTotal) {
+    var raw = parseFloat(document.getElementById('coDiscount').value) || 0;
+    if (raw < 0) raw = 0;
+    var isPct = document.getElementById('coDiscUnitPct').checked;
+    var amount = isPct ? grossTotal * (raw / 100) : raw;
+    if (amount > grossTotal) amount = grossTotal;
+    if (amount < 0) amount = 0;
+    return amount;
+  }
+
+  // For showing "10%" on the invoice line item rather than just "Discount"
+  // when a percentage was used — empty for flat £ (no extra context needed).
+  function discountLabel_() {
+    var raw = parseFloat(document.getElementById('coDiscount').value) || 0;
+    if (raw <= 0) return '';
+    return document.getElementById('coDiscUnitPct').checked ? (raw + '%') : '';
+  }
+
   function calcTotal() {
     var grossTotal = 0;
     getItemRows().forEach(function (row) {
@@ -1296,10 +1541,7 @@
     });
 
     if (invoiceMode === 'paid') {
-      var discountEl = document.getElementById('coDiscount');
-      var discount = discountEl ? (parseFloat(discountEl.value) || 0) : 0;
-      if (discount < 0) discount = 0;
-      if (discount > grossTotal) discount = grossTotal;
+      var discount = computeDiscountAmount_(grossTotal);
       var total = grossTotal - discount;
 
       // Lopay Link carries an extra 0.49% on top of the standard card rate —
@@ -1323,10 +1565,7 @@
         feeLine.style.display = 'none';
       }
     } else {
-      var draftDiscountEl = document.getElementById('coDiscount');
-      var draftDiscount = draftDiscountEl ? (parseFloat(draftDiscountEl.value) || 0) : 0;
-      if (draftDiscount < 0) draftDiscount = 0;
-      if (draftDiscount > grossTotal) draftDiscount = grossTotal;
+      var draftDiscount = computeDiscountAmount_(grossTotal);
       document.getElementById('totalPreview').textContent = '£' + (grossTotal - draftDiscount).toFixed(2);
     }
   }
@@ -1444,6 +1683,7 @@
     document.getElementById('fIncludeLink').checked = true;
     onIncludeLinkChange();
     document.getElementById('coDiscount').value = inv.discount ? inv.discount : '';
+    document.getElementById('coDiscUnitFlat').checked = true;
 
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
@@ -1486,6 +1726,7 @@
     // the draft's own discount rather than leaving whatever was already
     // sitting in the box (which could be stale from an unrelated draft).
     document.getElementById('coDiscount').value = inv.discount ? inv.discount : '';
+    document.getElementById('coDiscUnitFlat').checked = true;
 
     // Every item on the draft gets its own row, full stop — what was quoted
     // is what must carry over. This used to only add rows for items that
@@ -1643,6 +1884,8 @@
     btn.disabled = true;
     btn.textContent = isEdit ? 'Saving…' : 'Generating…';
 
+    var draftGrossTotal = items.reduce(function (s, i) { return s + i.qty * i.unitPrice; }, 0);
+
     var payload = {
       action:    'createQuickInvoice',
       password:  getPassword(),
@@ -1650,9 +1893,10 @@
       company:   company,
       email:     document.getElementById('fEmail').value.trim(),
       items:     items,
-      payLink:     document.getElementById('fPayLink').value.trim(),
-      includeLink: document.getElementById('fIncludeLink').checked,
-      discount:    parseFloat(document.getElementById('coDiscount').value) || 0
+      payLink:       document.getElementById('fPayLink').value.trim(),
+      includeLink:   document.getElementById('fIncludeLink').checked,
+      discount:      computeDiscountAmount_(draftGrossTotal),
+      discountLabel: discountLabel_()
     };
     if (isEdit) payload.ref = editingDraftRef;
     if (pendingBniChapter) payload.bniChapter = pendingBniChapter;
@@ -1742,6 +1986,7 @@
     document.getElementById('fIncludeLink').checked = true;
     onIncludeLinkChange();
     document.getElementById('coDiscount').value = '';
+    document.getElementById('coDiscUnitFlat').checked = true;
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
     addItemRow();
@@ -1880,7 +2125,7 @@
         if (data.email) document.getElementById('fEmail').value = data.email;
         if (data.phone) document.getElementById('coPhone').value = data.phone;
         if (data.address) document.getElementById('coAddress').value = data.address;
-        if (data.discount) document.getElementById('coDiscount').value = data.discount;
+        if (data.discount) { document.getElementById('coDiscount').value = data.discount; document.getElementById('coDiscUnitFlat').checked = true; }
 
         var matchedAny = false;
         (data.items || []).forEach(function (it) {
@@ -1998,6 +2243,8 @@
     // send reuses the same one, so the server can tell it's the same order.
     if (!currentOrderKey) currentOrderKey = newOrderKey_();
 
+    var grossTotal = basket.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
+
     var payload = {
       password:      getPassword(),
       company:       company,
@@ -2011,13 +2258,13 @@
       fulfilment:    fulfilEl.value,
       source:        document.getElementById('coSource').value.trim(),
       notes:         document.getElementById('coNotes').value.trim(),
-      discount:      parseFloat(document.getElementById('coDiscount').value) || 0,
+      discount:      computeDiscountAmount_(grossTotal),
+      discountLabel: discountLabel_(),
       depositAmount: depositAmountVal,
       orderKey:      currentOrderKey
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
 
-    var grossTotal = basket.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
     var total = Math.max(0, grossTotal - payload.discount);
     var summary = basket.map(function (i) { return i.name + ' x' + i.qty; }).join('\n');
     var invoiceNumAtSubmit = coInvoiceNum;
@@ -2074,6 +2321,7 @@
     document.getElementById('coSource').value = '';
     document.getElementById('coNotes').value = '';
     document.getElementById('coDiscount').value = '';
+    document.getElementById('coDiscUnitFlat').checked = true;
     document.querySelectorAll('input[name="coPay"], input[name="coFulfilment"], input[name="coSourceType"]').forEach(function (r) { r.checked = false; });
     resetPayStatus_();
     document.getElementById('itemsContainer').innerHTML = '';
