@@ -465,6 +465,10 @@
         <input type="text" id="saRef" placeholder="e.g. their original invoice number">
       </div>
       <div class="field">
+        <label>Address <span style="color:#999;font-weight:400">(optional)</span></label>
+        <textarea id="saAddress" rows="2" style="width:100%;box-sizing:border-box;font-family:inherit"></textarea>
+      </div>
+      <div class="field">
         <label>Date</label>
         <input type="date" id="saDate">
       </div>
@@ -739,6 +743,7 @@
       body: JSON.stringify({
         action: 'generateStandaloneInvoice', password: getPassword(),
         company: company, email: email, invoiceNumber: ref,
+        address: document.getElementById('saAddress').value.trim(),
         date: document.getElementById('saDate').value || undefined,
         items: items, sendEmail: sendEmail
       })
