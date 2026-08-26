@@ -586,13 +586,18 @@
     if (e.key === 'Enter') submitLockScreen();
   });
 
-  // On load: if a password is already cached, verify it's still correct
-  // before showing anything (handles the case where it's since been
-  // changed) rather than trusting it blindly.
+  // On load with a cached password: unlock IMMEDIATELY and verify in the
+  // background — waiting for the round-trip meant a blank lock screen for
+  // several seconds on every single open (much longer on weak mobile
+  // signal), which read as the app hanging. If the cached password turns
+  // out stale, the background check locks it right back; every data call
+  // also independently locks on a 'forbidden' response, so a stale
+  // password can never actually do anything in the meantime.
   (function () {
     var pw = getPassword();
     if (!pw) return;
-    verifyPassword(pw, function (ok) { if (ok) unlockApp(); else lockApp('Session expired — please re-enter the password.'); });
+    unlockApp();
+    verifyPassword(pw, function (ok) { if (!ok) lockApp('Session expired — please re-enter the password.'); });
   })();
 
   var itemRowCount = 0;
