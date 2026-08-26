@@ -494,6 +494,15 @@
       <a class="download-btn" id="standaloneDownloadBtn" href="#">Download PDF</a>
     </div>
   </div>
+
+  <!-- ══════════ SYSTEM CHECK — outside the tabs, always available ══════════ -->
+  <div style="margin-top:32px;padding-top:20px;border-top:1px solid #ececea">
+    <button type="button" class="add-item-btn" id="tagifyCheckBtn" onclick="runTagifyCheck()">Check Tagify product codes</button>
+    <div style="font-size:12px;color:#999;margin-top:8px;line-height:1.5">
+      Compares every product you sell — in person and on the website — against Tagify's live catalog, and lists anything that wouldn't reach them.
+    </div>
+    <div id="tagifyCheckResult" style="margin-top:12px"></div>
+  </div>
 </div>
 
 <div class="success" id="successScreen">
@@ -666,6 +675,56 @@
     document.getElementById('standaloneScreen').style.display = (t === 'standalone') ? 'block' : 'none';
     if (t === 'bni') loadBniChapters();
     if (t === 'standalone' && !document.getElementById('standaloneItemsList').children.length) addStandaloneItemRow();
+  }
+
+  /* ═══════════════ TAGIFY MAPPING CHECK ═══════════════ */
+
+  // Sends this page's own CATALOG_DATA along, so the backend can check every
+  // sellable variant has a Tagify code without a second copy of the catalog
+  // having to exist in Code.gs.
+  function runTagifyCheck() {
+    var btn = document.getElementById('tagifyCheckBtn');
+    var out = document.getElementById('tagifyCheckResult');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    out.innerHTML = '<div style="font-size:13px;color:#888">Fetching Tagify\'s live catalog…</div>';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'validateTagifyMappings', password: getPassword(), catalog: CATALOG_DATA })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = 'Check Tagify product codes';
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          out.innerHTML = '<div style="font-size:13px;color:#e53e3e">' + escapeHtml_(data.message || 'Check failed.') + '</div>';
+          return;
+        }
+
+        var summary = 'Checked ' + data.inPersonChecked + ' in-person and ' + data.websiteChecked +
+          ' website codes against ' + data.liveVariantCount + ' live Tagify variants.';
+
+        if (!data.problemCount) {
+          out.innerHTML = '<div class="tagify-badge good" style="display:block;max-width:none">Everything maps correctly. ' +
+            escapeHtml_(summary) + '</div>';
+          return;
+        }
+
+        out.innerHTML =
+          '<div class="tagify-badge bad" style="display:block;max-width:none">' +
+            data.problemCount + ' problem' + (data.problemCount === 1 ? '' : 's') + ' found. ' + escapeHtml_(summary) +
+          '</div>' +
+          '<div style="font-size:12px;color:#555;line-height:1.7;margin-top:8px;font-family:ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word">' +
+            data.problems.map(escapeHtml_).join('\n') +
+          '</div>';
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'Check Tagify product codes';
+        out.innerHTML = '<div style="font-size:13px;color:#e53e3e">Check failed — please try again.</div>';
+      });
   }
 
   /* ═══════════════ STANDALONE INVOICE (no order, no sheet row) ═══════════════ */
