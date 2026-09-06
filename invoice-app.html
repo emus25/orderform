@@ -238,6 +238,7 @@
   <div class="toggle" id="tabToggle">
     <button type="button" id="btnInvoice" class="active" onclick="setTab('invoice')">Invoice</button>
     <button type="button" id="btnBni" onclick="setTab('bni')">BNI Badges</button>
+    <button type="button" id="btnPayRun" onclick="setTab('payrun')">Tagify</button>
     <button type="button" id="btnStandalone" onclick="setTab('standalone')">Old Invoice</button>
   </div>
 
@@ -442,6 +443,18 @@
       <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.5">Find this on the chapter's own site — the page literally titled "Member List". Only needed the first time; leave blank when rescanning a chapter already in the list above.</div>
       <button class="generate-btn" id="bniScanBtn" onclick="scanBniChapter()" style="margin-top:14px">Scan chapter</button>
     </div>
+  </div>
+
+  <!-- ══════════ TAGIFY PAY RUN — what's owed, what's outstanding ══════════ -->
+  <div id="payRunScreen" style="display:none">
+    <div id="payRunHeadline" style="background:#1a1a1a;color:#fff;border-radius:14px;padding:18px 20px;margin-bottom:14px">
+      <div style="font-size:12px;opacity:.7;letter-spacing:.3px">TO PAY TAGIFY</div>
+      <div style="font-size:34px;font-weight:700;line-height:1.2" id="payRunTotal">—</div>
+      <div style="font-size:12px;opacity:.7" id="payRunCount">&nbsp;</div>
+    </div>
+    <button type="button" class="generate-btn" id="payRunMarkBtn" onclick="markPayRunPaid()" style="display:none;margin-bottom:10px">Mark these as paid</button>
+    <button type="button" class="add-item-btn" id="payRunRefreshBtn" onclick="loadPayRun()" style="margin-bottom:16px">Refresh</button>
+    <div id="payRunBody"></div>
   </div>
 
   <!-- ══════════ STANDALONE INVOICE — no order, no sheet row ══════════ -->
@@ -670,11 +683,147 @@
     document.getElementById('btnInvoice').classList.toggle('active', t === 'invoice');
     document.getElementById('btnBni').classList.toggle('active', t === 'bni');
     document.getElementById('btnStandalone').classList.toggle('active', t === 'standalone');
+    document.getElementById('btnPayRun').classList.toggle('active', t === 'payrun');
     document.getElementById('invoiceScreen').style.display = (t === 'invoice') ? 'block' : 'none';
     document.getElementById('bniScreen').style.display = (t === 'bni') ? 'block' : 'none';
     document.getElementById('standaloneScreen').style.display = (t === 'standalone') ? 'block' : 'none';
+    document.getElementById('payRunScreen').style.display = (t === 'payrun') ? 'block' : 'none';
     if (t === 'bni') loadBniChapters();
     if (t === 'standalone' && !document.getElementById('standaloneItemsList').children.length) addStandaloneItemRow();
+    if (t === 'payrun' && !document.getElementById('payRunBody').children.length) loadPayRun();
+  }
+
+  /* ═══════════════ TAGIFY PAY RUN ═══════════════ */
+
+  // The exact orders shown as unpaid on the last load — snapshotted so an
+  // order placed while you're paying Tagify can't get marked paid too.
+  var payRunPending = [];
+
+  // Records ONE payment covering the batch — the equivalent of the single
+  // merged cash figure, but as a row in Supplier Payments. Asks for the amount
+  // actually handed over, which may not match the computed total exactly.
+  function markPayRunPaid() {
+    if (!payRunPending.length) return;
+    var expected = payRunPending.reduce(function (s, o) { return s + parseFloat(o.cost || 0); }, 0);
+
+    var entered = prompt(
+      'How much did you pay Tagify?\n\n' +
+      payRunPending.length + ' order(s), expected £' + expected.toFixed(2) + '.\n' +
+      'Change it if you paid a different amount.',
+      expected.toFixed(2)
+    );
+    if (entered === null) return;
+    var amount = parseFloat(String(entered).replace(/[^0-9.\-]/g, ''));
+    if (!(amount > 0)) { alert('Enter a valid amount.'); return; }
+
+    var btn = document.getElementById('payRunMarkBtn');
+    btn.disabled = true;
+    btn.textContent = 'Recording…';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'recordTagifyPayment', password: getPassword(),
+        amount: amount,
+        invoices: payRunPending.map(function (o) { return o.invoiceNumber; })
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') { alert(data.message || 'Could not record payment.'); loadPayRun(); return; }
+        loadPayRun(); // re-read so the list reflects the sheet, not an assumption
+      })
+      .catch(function () {
+        btn.disabled = false;
+        alert('Could not record payment — check your connection.');
+        loadPayRun();
+      });
+  }
+
+  // One row per order, compact — this list is read at a glance, not studied.
+  function payRunRow_(o, showCost) {
+    var dateStr = '';
+    try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
+    var age = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #f0f0ee">' +
+        '<div style="min-width:0;flex:1">' +
+          '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+            escapeHtml_(o.company) + '</div>' +
+          '<div style="font-size:11px;color:#999">#' + escapeHtml_(o.invoiceNumber) +
+            (o.isWebsite ? ' · Website' : '') + (dateStr ? ' · ' + dateStr : '') +
+            (age !== null && age > 0 ? ' · ' + age + 'd' : '') + '</div>' +
+        '</div>' +
+        (showCost ? '<div style="font-size:13px;font-weight:600;white-space:nowrap">£' + parseFloat(o.cost || 0).toFixed(2) + '</div>' : '') +
+      '</div>';
+  }
+
+  function payRunSection_(title, items, showCost, emptyText, accent) {
+    if (!items.length) {
+      return '<div style="margin-bottom:20px">' +
+        '<div style="font-size:13px;font-weight:700;margin-bottom:6px">' + escapeHtml_(title) + ' <span style="color:#999;font-weight:400">0</span></div>' +
+        '<div style="font-size:12px;color:#999">' + escapeHtml_(emptyText) + '</div></div>';
+    }
+    return '<div style="margin-bottom:20px">' +
+      '<div style="font-size:13px;font-weight:700;margin-bottom:2px">' + escapeHtml_(title) +
+        ' <span style="color:' + accent + '">' + items.length + '</span></div>' +
+      items.map(function (o) { return payRunRow_(o, showCost); }).join('') +
+    '</div>';
+  }
+
+  function loadPayRun() {
+    var btn = document.getElementById('payRunRefreshBtn');
+    var body = document.getElementById('payRunBody');
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    body.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">Loading…</div>';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'tagifyPayRun', password: getPassword() })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          body.innerHTML = '<div style="font-size:13px;color:#e53e3e">' + escapeHtml_(data.message || 'Could not load.') + '</div>';
+          return;
+        }
+
+        var toPay = data.toPay || [], awaiting = data.awaiting || [], noArtwork = data.noArtwork || [];
+        document.getElementById('payRunTotal').textContent = '£' + parseFloat(data.toPayTotal || 0).toFixed(2);
+        document.getElementById('payRunCount').textContent = toPay.length
+          ? toPay.length + ' order' + (toPay.length === 1 ? '' : 's') + ' since your last payment'
+          : 'All settled — nothing outstanding';
+
+        // Held so "Mark these as paid" settles exactly the orders shown, not
+        // whatever happens to be unpaid by the time the button is pressed.
+        payRunPending = toPay;
+        var markBtn = document.getElementById('payRunMarkBtn');
+        markBtn.style.display = toPay.length ? 'block' : 'none';
+        markBtn.textContent = 'Mark these ' + toPay.length + ' as paid';
+
+        body.innerHTML =
+          payRunSection_('Not yet paid for', toPay, true,
+            'Nothing owed — every forwarded order is covered by a recorded payment.', '#b3261e') +
+          payRunSection_('Paid, not shipped yet', awaiting, false,
+            'Nothing outstanding from previous payments.', '#8a6100') +
+          payRunSection_('Waiting on artwork', noArtwork, false,
+            'All outstanding orders have their artwork.', '#8a6100') +
+          '<div style="font-size:11px;color:#999;line-height:1.6;margin-top:4px;padding-top:12px;border-top:1px solid #f0f0ee">' +
+            'After paying Tagify, press the button above and enter what you handed over. ' +
+            'It logs one row in <b>Supplier Payments</b> covering those orders, and they drop off this list. ' +
+            'Your order sheets aren\'t touched.' +
+          '</div>';
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+        body.innerHTML = '<div style="font-size:13px;color:#e53e3e">Could not load — please try again.</div>';
+      });
   }
 
   /* ═══════════════ TAGIFY MAPPING CHECK ═══════════════ */
