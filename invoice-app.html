@@ -708,6 +708,8 @@
   // The exact orders shown as unpaid on the last load — snapshotted so an
   // order placed while you're paying Tagify can't get marked paid too.
   var payRunPending = [];
+  var payRunAwaiting = [];
+  var payRunNoArtwork = [];
 
   // Records ONE payment covering the batch — the equivalent of the single
   // merged cash figure, but as a row in Supplier Payments. Asks for the amount
@@ -769,7 +771,31 @@
       '</div>';
   }
 
-  function payRunSection_(title, items, showCost, emptyText, accent) {
+  // "These are done" — writes Yes to the Shipped column so finished orders
+  // drop off both the awaiting and artwork lists. Used when Tagify never
+  // marked them shipped on their side, which is why they lingered.
+  function clearPayRunSection(which) {
+    var items = which === 'awaiting' ? payRunAwaiting : payRunNoArtwork;
+    if (!items.length) return;
+    if (!confirm('Mark these ' + items.length + ' order(s) as completed?\n\nThey\'ll drop off the dashboard. Their "Shipped" column gets set to Yes.')) return;
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'markOrdersComplete', password: getPassword(),
+        invoices: items.map(function (o) { return o.invoiceNumber; })
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') { alert(data.message || 'Could not update.'); }
+        loadPayRun();
+      })
+      .catch(function () { alert('Could not update — check your connection.'); loadPayRun(); });
+  }
+
+  function payRunSection_(title, items, showCost, emptyText, accent, clearKey) {
     if (!items.length) {
       return '<div style="margin-bottom:20px">' +
         '<div style="font-size:13px;font-weight:700;margin-bottom:6px">' + escapeHtml_(title) + ' <span style="color:#999;font-weight:400">0</span></div>' +
@@ -779,6 +805,9 @@
       '<div style="font-size:13px;font-weight:700;margin-bottom:2px">' + escapeHtml_(title) +
         ' <span style="color:' + accent + '">' + items.length + '</span></div>' +
       items.map(function (o) { return payRunRow_(o, showCost); }).join('') +
+      (clearKey ? '<button type="button" onclick="clearPayRunSection(\'' + clearKey + '\')" ' +
+        'style="font-size:12px;color:#888;background:none;border:none;padding:8px 0 0;cursor:pointer;text-decoration:underline">' +
+        'These are all done — clear them</button>' : '') +
     '</div>';
   }
 
@@ -815,6 +844,8 @@
         // Held so "Mark these as paid" settles exactly the orders shown, not
         // whatever happens to be unpaid by the time the button is pressed.
         payRunPending = toPay;
+        payRunAwaiting = awaiting;
+        payRunNoArtwork = noArtwork;
         var markBtn = document.getElementById('payRunMarkBtn');
         markBtn.style.display = toPay.length ? 'block' : 'none';
         markBtn.textContent = 'Mark these ' + toPay.length + ' as paid';
@@ -823,9 +854,9 @@
           payRunSection_('Not yet paid for', toPay, true,
             'Nothing owed — every forwarded order is covered by a recorded payment.', '#b3261e') +
           payRunSection_('Paid, not shipped yet', awaiting, false,
-            'Nothing outstanding from previous payments.', '#8a6100') +
+            'Nothing outstanding from previous payments.', '#8a6100', 'awaiting') +
           payRunSection_('Waiting on artwork', noArtwork, false,
-            'All outstanding orders have their artwork.', '#8a6100') +
+            'All outstanding orders have their artwork.', '#8a6100', 'noArtwork') +
           '<div style="font-size:11px;color:#999;line-height:1.6;margin-top:4px;padding-top:12px;border-top:1px solid #f0f0ee">' +
             'After paying Tagify, press the button above and enter what you handed over. ' +
             'It logs one row in <b>Supplier Payments</b> covering those orders, and they drop off this list. ' +
