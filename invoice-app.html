@@ -664,12 +664,22 @@
 
     "Keyring": { price: 60, cost: 12.50, variants: ["Regular", "Slanted"] },
 
-    "Digital Member Name Badges": { price: 10, cost: 5.40, variants: [] },
-    "£1/year Hosting Fee": { price: 1, cost: 0, variants: [] },
+    // "ownCost" is the part of `cost` that is NOT owed to Tagify — our own
+    // outlay. Only needed where the two differ; anything without it is
+    // assumed to be entirely a Tagify cost. Used by the Tagify pay run so the
+    // amount owed to them isn't inflated by costs that were never theirs.
+    // Badges: £5.00 is Tagify's charge, the 40p is metal holders from Amazon.
+    "Digital Member Name Badges": { price: 10, cost: 5.40, ownCost: 0.40, variants: [] },
+    "£1/year Hosting Fee": { price: 1, cost: 0, ownCost: 0, variants: [] },
     // Software/access product, not a physical card — no cost, no variant,
     // and deliberately no INPERSON_TAGIFY mapping in Code.gs, same pattern
     // as the two items above. Nothing to manufacture, so nothing forwards.
-    "Exposure Boost Pro Plan Lifetime Access": { price: 99, cost: 0, variants: [] }
+    // 20% of the £99 sale price. Note this is a FIXED per-unit figure like
+    // every other cost here — if the Pro Plan is ever sold at a different
+    // price, this won't scale with it on its own. Tagify has no involvement,
+    // so the whole cost is ours (ownCost === cost) and none of it is owed
+    // to them, even though it's nearly always sold alongside a card.
+    "Exposure Boost Pro Plan Lifetime Access": { price: 99, cost: 19.80, ownCost: 19.80, variants: [] }
   };
 
   var CATALOG_NAMES = Object.keys(CATALOG_DATA);
@@ -781,7 +791,10 @@
 
     fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'tagifyPayRun', password: getPassword() })
+      // Catalog goes along so the backend can subtract non-Tagify items
+      // (Pro Plan, hosting, badges) from each order's supplier cost without a
+      // second copy of the price list existing in Code.gs.
+      body: JSON.stringify({ action: 'tagifyPayRun', password: getPassword(), catalog: CATALOG_DATA })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
