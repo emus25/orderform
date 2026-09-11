@@ -616,6 +616,7 @@
     // Staggered rather than fired alongside the pending list, for the same
     // concurrent-request flakiness described above; it retries once anyway.
     setTimeout(loadPartners, 1200);
+    setTimeout(syncCatalogToServer, 2400);
   }
 
   function submitLockScreen() {
@@ -845,6 +846,22 @@
               '<div style="font-size:15px;font-weight:700">' + escapeHtml_(p.name) + '</div>' +
               '<div style="font-size:12px;color:#999">' + p.rate + '%' + (p.code ? ' · code ' + escapeHtml_(p.code) : '') + (p.active ? '' : ' · inactive') + '</div>' +
             '</div>' +
+            (p.heldInvoices && p.heldInvoices.length
+              ? '<div style="background:#fff8e6;border-radius:10px;padding:10px 12px;margin:10px 0">' +
+                  '<div style="font-size:12px;font-weight:700;color:#8a6100">NEEDS YOUR APPROVAL</div>' +
+                  '<div style="font-size:11px;color:#8a6100;margin-bottom:4px">These businesses are already in your records.</div>' +
+                  p.heldInvoices.map(function (h) {
+                    var r = escapeHtml_(h.ref);
+                    return '<div style="padding:8px 0;border-top:1px solid #f3e6c4">' +
+                      '<div style="font-size:13px;font-weight:600">' + escapeHtml_(h.company) + ' · £' + parseFloat(h.total || 0).toFixed(2) + '</div>' +
+                      '<div style="font-size:11px;color:#999;margin-bottom:6px">' + r + ' · ' + escapeHtml_(h.email) + '</div>' +
+                      '<button type="button" class="pending-mini-btn" onclick="resolvePartnerInvoice(\'' + r + '\',\'credit\')">Send, credit ' + escapeHtml_(p.name.split(' ')[0]) + '</button> ' +
+                      '<button type="button" class="pending-mini-btn" onclick="resolvePartnerInvoice(\'' + r + '\',\'nocredit\')">Send, no credit</button> ' +
+                      '<button type="button" class="pending-mini-btn" onclick="resolvePartnerInvoice(\'' + r + '\',\'cancel\')">Cancel</button>' +
+                    '</div>';
+                  }).join('') +
+                '</div>'
+              : '') +
             '<div style="display:flex;gap:18px;margin:10px 0 12px">' +
               '<div><div style="font-size:11px;color:#999">OWED NOW</div><div style="font-size:24px;font-weight:700">£' + p.owed.toFixed(2) + '</div></div>' +
               '<div><div style="font-size:11px;color:#999">PENDING</div><div style="font-size:15px;font-weight:600;color:#8a6100;margin-top:6px">£' + p.pending.toFixed(2) + '</div></div>' +
@@ -857,6 +874,7 @@
             (p.pendingOrders.length
               ? '<div style="font-size:11px;color:#999;margin:14px 0 2px">WAITING ON THE CUSTOMER TO PAY IN FULL</div>' + p.pendingOrders.map(partnerOrderRow_).join('')
               : '') +
+            '<button type="button" onclick="setPartnerPassword(' + i + ')" style="font-size:12px;color:#888;background:none;border:none;padding:12px 0 0;cursor:pointer;text-decoration:underline">Portal login — set or reset password</button>' +
           '</div>';
         }).join('');
       })
@@ -888,6 +906,48 @@
         loadPartnerLedger();
       })
       .catch(function () { alert('Could not record payout — check your connection.'); loadPartnerLedger(); });
+  }
+
+  // Where partners sign in. partner.html lives alongside this page.
+  var PARTNER_PORTAL_URL = 'https://orderform.exposureboost.co.uk/partner.html';
+
+  // Keeps the partner portal's price list in step with CATALOG_DATA — the one
+  // place prices are defined. The server keeps name/price/options only.
+  function syncCatalogToServer() {
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'syncCatalog', password: getPassword(), catalog: CATALOG_DATA }) })
+      .catch(function () {});
+  }
+
+  function setPartnerPassword(i) {
+    var p = partnerLedgerCache[i];
+    if (!p) return;
+    if (!confirm('Create a new portal password for ' + p.name + '?\n\nAny previous password stops working straight away.')) return;
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'setPartnerPassword', password: getPassword(), name: p.name }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') { alert(data.message || 'Could not set a password.'); return; }
+        // Shown once only — the server keeps nothing it could show again.
+        prompt('Send these to ' + p.name + '. This is the only time the password is shown.',
+          PARTNER_PORTAL_URL + '  —  Code: ' + data.code + '  —  Password: ' + data.password);
+      })
+      .catch(function () { alert('Could not set a password — check your connection.'); });
+  }
+
+  function resolvePartnerInvoice(ref, decision) {
+    var msg = decision === 'cancel' ? 'Cancel ' + ref + '? It will not be sent.'
+      : decision === 'nocredit' ? 'Send ' + ref + ' to the customer WITHOUT crediting the partner?'
+      : 'Send ' + ref + ' to the customer and credit the partner?';
+    if (!confirm(msg)) return;
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'resolvePartnerInvoice', password: getPassword(), ref: ref, decision: decision }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') alert(data.message || 'Could not update.');
+        else if (decision !== 'cancel' && data.emailed === false) alert('Approved, but the email to the customer failed' + (data.message ? ': ' + data.message : '') + '.');
+        loadPartnerLedger();
+      })
+      .catch(function () { alert('Could not update — check your connection.'); loadPartnerLedger(); });
   }
 
   /* ═══════════════ ORDER PIPELINE ═══════════════ */
