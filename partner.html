@@ -88,6 +88,18 @@
   </div>
 </div>
 
+<div class="lock hidden" id="pwScreen">
+  <div class="lock-box">
+    <div class="hello" style="text-align:center" id="pwTitle">Choose your own password</div>
+    <div class="sub" style="text-align:center" id="pwSub">At least 8 characters.</div>
+    <div class="msg err" id="pwMsg"></div>
+    <div class="field"><label>New password</label><input type="password" id="pwNew" autocomplete="new-password"></div>
+    <div class="field"><label>Type it again</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
+    <button class="btn" id="pwBtn" onclick="changePassword()" style="margin-top:6px">Save password</button>
+    <div style="text-align:center;margin-top:14px"><button class="link hidden" id="pwCancel" onclick="closePwScreen()">Cancel</button></div>
+  </div>
+</div>
+
 <div class="page hidden" id="app">
   <div class="hello" id="hello">Hi</div>
   <div class="sub">You earn <b id="rateTxt"></b> of everything a business you refer pays — on every order they ever place.</div>
@@ -125,7 +137,7 @@
     <button class="btn btn-light" onclick="loadMine()">Refresh</button>
   </div>
 
-  <div style="text-align:center;margin-top:28px"><button class="link" onclick="signOut()">Sign out</button></div>
+  <div style="text-align:center;margin-top:28px"><button class="link" onclick="showPwScreen(false)">Change password</button> &nbsp;·&nbsp; <button class="link" onclick="signOut()">Sign out</button></div>
 </div>
 
 <script>
@@ -162,6 +174,7 @@
       .then(function (d) {
         if (d.status === 'forbidden') { signOut('Your sign-in has changed — please sign in again.'); throw new Error('auth'); }
         if (d.status === 'locked') { signOut(d.message); throw new Error('auth'); }
+        if (d.status === 'mustchange') { showPwScreen(true); throw new Error('auth'); }
         return d;
       });
   }
@@ -189,19 +202,66 @@
 
   function signOut(message) {
     store(CODE_KEY, null); store(PW_KEY, null);
+    pendingLogin = null;
     document.getElementById('app').classList.add('hidden');
+    document.getElementById('pwScreen').classList.add('hidden');
     document.getElementById('lockScreen').classList.remove('hidden');
     document.getElementById('liPw').value = '';
     if (message) showMsg('lockMsg', 'err', message);
     else document.getElementById('lockMsg').classList.remove('show');
   }
 
+  var pendingLogin = null;
+
   function openApp(d) {
+    // Still on the temporary password Ediz issued? Choose a new one first —
+    // the server won't allow anything else until then.
+    if (d.mustChange) { pendingLogin = d; showPwScreen(true); return; }
     document.getElementById('hello').textContent = 'Hi ' + String(d.name || '').split(' ')[0];
     document.getElementById('rateTxt').textContent = d.rate + '%';
     document.getElementById('lockScreen').classList.add('hidden');
+    document.getElementById('pwScreen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     loadCatalog();
+  }
+
+  function showPwScreen(forced) {
+    document.getElementById('lockScreen').classList.add('hidden');
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('pwScreen').classList.remove('hidden');
+    document.getElementById('pwTitle').textContent = forced ? 'Choose your own password' : 'Change password';
+    document.getElementById('pwSub').textContent = forced
+      ? 'The one Ediz sent is temporary. Pick your own so only you know it — at least 8 characters.'
+      : 'At least 8 characters.';
+    document.getElementById('pwCancel').classList.toggle('hidden', !!forced);
+    document.getElementById('pwMsg').classList.remove('show');
+    document.getElementById('pwNew').value = '';
+    document.getElementById('pwNew2').value = '';
+  }
+
+  function closePwScreen() {
+    document.getElementById('pwScreen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+  }
+
+  function changePassword() {
+    var a = document.getElementById('pwNew').value, b = document.getElementById('pwNew2').value;
+    if (a.length < 8) return showMsg('pwMsg', 'err', 'Use at least 8 characters.');
+    if (a !== b) return showMsg('pwMsg', 'err', "Those don't match — type it again.");
+    var btn = document.getElementById('pwBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    api('partnerChangePassword', { newPassword: a })
+      .then(function (d) {
+        btn.disabled = false; btn.textContent = 'Save password';
+        if (d.status !== 'success') return showMsg('pwMsg', 'err', d.message || 'Could not save — try again.');
+        store(PW_KEY, a);
+        if (pendingLogin) { var login = pendingLogin; pendingLogin = null; login.mustChange = false; openApp(login); }
+        else closePwScreen();
+      })
+      .catch(function (e) {
+        btn.disabled = false; btn.textContent = 'Save password';
+        if (e.message !== 'auth') showMsg('pwMsg', 'err', 'Could not connect — try again.');
+      });
   }
 
   function showTab(t) {
@@ -368,6 +428,7 @@
   }
 
   document.getElementById('liPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') signIn(); });
+  document.getElementById('pwNew2').addEventListener('keydown', function (e) { if (e.key === 'Enter') changePassword(); });
 
   // Signed in on this phone before? Re-check the saved details with the
   // server before showing anything, so a reset password takes effect at once.

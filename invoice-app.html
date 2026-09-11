@@ -928,7 +928,8 @@
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') { alert(data.message || 'Could not set a password.'); return; }
         // Shown once only — the server keeps nothing it could show again.
-        prompt('Send these to ' + p.name + '. This is the only time the password is shown.',
+        prompt('Send these to ' + p.name + '. It\'s a temporary password — she\'ll choose her own the first time she signs in. '
+          + 'This is the only time it\'s shown.',
           PARTNER_PORTAL_URL + '  —  Code: ' + data.code + '  —  Password: ' + data.password);
       })
       .catch(function () { alert('Could not set a password — check your connection.'); });
