@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ExposureBoost">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#1a1a1a">
+<link rel="apple-touch-icon" href="logo.png">
+<title>ExposureBoost — Partners</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  Partner portal — a stripped-down version of the invoice app for referral
+  partners. Partners can raise invoices at catalogue prices and see their own
+  referrals and commission. Prices, access and every field shown are decided
+  server-side (Code.gs, "Partner portal"); this page is only a view of it.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Figtree', sans-serif; background: #f5f5f3; color: #1a1a1a; font-size: 16px; -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+  header { background: #1a1a1a; padding: 18px 20px; display: flex; align-items: center; justify-content: center; }
+  header img { height: 28px; width: auto; display: block; }
+  .page { padding: 24px 18px 60px; max-width: 520px; margin: 0 auto; }
+  .hello { font-size: 21px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #888; margin-bottom: 18px; line-height: 1.55; }
+
+  .toggle { display: flex; background: #fff; border: 1px solid #e0e0dd; border-radius: 10px; padding: 4px; margin-bottom: 18px; }
+  .toggle button { flex: 1; border: none; background: transparent; padding: 10px; border-radius: 8px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; color: #888; cursor: pointer; }
+  .toggle button.active { background: #1a1a1a; color: #fff; }
+
+  .card { background: #fff; border-radius: 14px; border: 1px solid #e8e8e5; padding: 16px; margin-bottom: 16px; }
+  .card-label { font-size: 12px; font-weight: 600; color: #999; letter-spacing: 0.3px; margin-bottom: 10px; text-transform: uppercase; }
+
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
+  .field input, .field select { width: 100%; font-family: 'Figtree', sans-serif; font-size: 15px; padding: 12px 14px; border: 1px solid #e0e0dd; border-radius: 10px; background: #fff; color: #1a1a1a; }
+  .field input:focus, .field select:focus { outline: none; border-color: #22a06b; }
+  .row { display: flex; gap: 10px; }
+  .row .field { flex: 1; }
+
+  .item { border-top: 1px solid #f0f0ee; padding-top: 14px; margin-top: 14px; }
+  .item:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+
+  .btn { width: 100%; background: #1a1a1a; color: #fff; border: none; border-radius: 12px; padding: 15px; font-family: 'Figtree', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn:disabled { opacity: 0.5; }
+  .btn-light { background: #f0f0ee; color: #1a1a1a; }
+  .link { font-size: 13px; color: #888; background: none; border: none; text-decoration: underline; cursor: pointer; font-family: inherit; }
+
+  .total { display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; padding: 14px 16px; background: #fff; border: 1px solid #e8e8e5; border-radius: 14px; margin-bottom: 16px; }
+
+  .msg { display: none; font-size: 13px; line-height: 1.5; padding: 12px 14px; border-radius: 10px; margin-bottom: 14px; }
+  .msg.show { display: block; }
+  .msg.err { background: #fdf1f1; color: #b3261e; }
+  .msg.ok { background: #f0faf5; color: #1a7a4c; }
+  .msg.warn { background: #fff8e6; color: #8a6100; }
+
+  .money { display: flex; gap: 10px; margin-bottom: 16px; }
+  .money > div { flex: 1; background: #fff; border: 1px solid #e8e8e5; border-radius: 14px; padding: 12px; min-width: 0; }
+  .money .k { font-size: 10px; color: #999; font-weight: 700; letter-spacing: 0.3px; }
+  .money .v { font-size: 19px; font-weight: 700; margin-top: 4px; }
+
+  .li { display: flex; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid #f0f0ee; }
+  .li:last-child { border-bottom: none; }
+  .li .n { font-size: 14px; font-weight: 600; }
+  .li .m { font-size: 12px; color: #999; margin-top: 2px; }
+  .li .a { text-align: right; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-top: 5px; }
+  .empty { font-size: 13px; color: #999; line-height: 1.5; }
+
+  .lock { min-height: calc(100dvh - 64px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .lock-box { width: 100%; max-width: 340px; background: #fff; border-radius: 14px; border: 1px solid #e8e8e5; padding: 24px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header><img src="logowhite.png" alt="ExposureBoost"></header>
+
+<div class="lock" id="lockScreen">
+  <div class="lock-box">
+    <div class="hello" style="text-align:center">Partner sign in</div>
+    <div class="sub" style="text-align:center">Use the code and password Ediz sent you.</div>
+    <div class="msg err" id="lockMsg"></div>
+    <div class="field"><label>Code</label><input type="text" id="liCode" autocapitalize="characters" autocomplete="username" spellcheck="false"></div>
+    <div class="field"><label>Password</label><input type="password" id="liPw" autocomplete="current-password"></div>
+    <button class="btn" id="liBtn" onclick="signIn()" style="margin-top:6px">Sign in</button>
+  </div>
+</div>
+
+<div class="page hidden" id="app">
+  <div class="hello" id="hello">Hi</div>
+  <div class="sub">You earn <b id="rateTxt"></b> of everything a business you refer pays — on every order they ever place.</div>
+
+  <div class="toggle">
+    <button type="button" id="tabNew" class="active" onclick="showTab('new')">New invoice</button>
+    <button type="button" id="tabMine" onclick="showTab('mine')">My referrals</button>
+  </div>
+
+  <div id="newScreen">
+    <div class="msg" id="newMsg"></div>
+    <div class="card">
+      <div class="card-label">Who it's for</div>
+      <div class="field"><label>Business name</label><input type="text" id="nCompany" autocomplete="off"></div>
+      <div class="field"><label>Their email — the invoice is sent here</label><input type="email" id="nEmail" autocomplete="off" inputmode="email" spellcheck="false"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">What they're ordering</div>
+      <div id="items"></div>
+      <button type="button" class="btn btn-light" onclick="addItem()" style="margin-top:14px">+ Add another item</button>
+    </div>
+    <div class="total"><span>Total</span><span id="totalTxt">£0.00</span></div>
+    <button class="btn" id="sendBtn" onclick="sendInvoice()">Send invoice</button>
+    <div class="sub" style="margin-top:12px">These are ExposureBoost's standard prices. The invoice is emailed to them from ExposureBoost, and you're credited automatically.</div>
+  </div>
+
+  <div id="mineScreen" class="hidden">
+    <div class="money">
+      <div><div class="k">OWED TO YOU</div><div class="v" id="mOwed">£0.00</div></div>
+      <div><div class="k">ON THE WAY</div><div class="v" id="mPending" style="color:#8a6100">£0.00</div></div>
+      <div><div class="k">PAID TO YOU</div><div class="v" id="mPaid" style="color:#1a7a4c">£0.00</div></div>
+    </div>
+    <div class="card"><div class="card-label">Invoices you've sent</div><div id="invList"></div></div>
+    <div class="card"><div class="card-label">Orders</div><div id="ordList"></div></div>
+    <button class="btn btn-light" onclick="loadMine()">Refresh</button>
+  </div>
+
+  <div style="text-align:center;margin-top:28px"><button class="link" onclick="signOut()">Sign out</button></div>
+</div>
+
+<script>
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcMfHCK9FHp8RZXnJBDOQ-5vLheJT4g0vo7hC5-7wGyHYnbY2TpmXnC1qjLtBmTW92pA/exec';
+  var CODE_KEY = 'eb_partner_code', PW_KEY = 'eb_partner_pw';
+  var CATALOG = {};
+  var itemSeq = 0;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function money(n) { return '£' + (parseFloat(n) || 0).toFixed(2); }
+  function fmtDate(iso) { try { return iso ? new Date(iso).toLocaleDateString('en-GB') : ''; } catch (e) { return ''; } }
+
+  function store(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function read(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+
+  function showMsg(id, kind, text) {
+    var el = document.getElementById(id);
+    el.className = 'msg show ' + kind;
+    el.textContent = text;
+    return false;
+  }
+
+  // Every request carries the partner's code + password; the server re-checks
+  // them each time, so there's no session to steal or expire silently.
+  function api(action, extra) {
+    var body = { action: action, partnerCode: read(CODE_KEY), partnerPassword: read(PW_KEY) };
+    for (var k in (extra || {})) body[k] = extra[k];
+    return fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(body) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.status === 'forbidden') { signOut('Your sign-in has changed — please sign in again.'); throw new Error('auth'); }
+        if (d.status === 'locked') { signOut(d.message); throw new Error('auth'); }
+        return d;
+      });
+  }
+
+  function signIn() {
+    var code = document.getElementById('liCode').value.trim().toUpperCase();
+    var pw = document.getElementById('liPw').value;
+    document.getElementById('lockMsg').classList.remove('show');
+    if (!code || !pw) return showMsg('lockMsg', 'err', 'Enter your code and password.');
+    var btn = document.getElementById('liBtn');
+    btn.disabled = true; btn.textContent = 'Checking…';
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'partnerLogin', partnerCode: code, partnerPassword: pw }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        btn.disabled = false; btn.textContent = 'Sign in';
+        if (d.status !== 'success') return showMsg('lockMsg', 'err', d.message || 'Incorrect code or password.');
+        store(CODE_KEY, code); store(PW_KEY, pw);
+        openApp(d);
+      })
+      .catch(function () {
+        btn.disabled = false; btn.textContent = 'Sign in';
+        showMsg('lockMsg', 'err', 'Could not connect — check your signal and try again.');
+      });
+  }
+
+  function signOut(message) {
+    store(CODE_KEY, null); store(PW_KEY, null);
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('lockScreen').classList.remove('hidden');
+    document.getElementById('liPw').value = '';
+    if (message) showMsg('lockMsg', 'err', message);
+    else document.getElementById('lockMsg').classList.remove('show');
+  }
+
+  function openApp(d) {
+    document.getElementById('hello').textContent = 'Hi ' + String(d.name || '').split(' ')[0];
+    document.getElementById('rateTxt').textContent = d.rate + '%';
+    document.getElementById('lockScreen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    loadCatalog();
+  }
+
+  function showTab(t) {
+    document.getElementById('tabNew').classList.toggle('active', t === 'new');
+    document.getElementById('tabMine').classList.toggle('active', t === 'mine');
+    document.getElementById('newScreen').classList.toggle('hidden', t !== 'new');
+    document.getElementById('mineScreen').classList.toggle('hidden', t !== 'mine');
+    if (t === 'mine') loadMine();
+  }
+
+  /* ── New invoice ── */
+
+  function loadCatalog() {
+    api('partnerCatalog').then(function (d) {
+      CATALOG = d.catalog || {};
+      if (!Object.keys(CATALOG).length) return showMsg('newMsg', 'warn', "The price list isn't available yet — let Ediz know.");
+      document.getElementById('items').innerHTML = '';
+      itemSeq = 0;
+      addItem();
+      calc();
+    }).catch(function (e) {
+      if (e.message !== 'auth') showMsg('newMsg', 'err', 'Could not load the price list — please refresh.');
+    });
+  }
+
+  function productOptions() {
+    return '<option value="">Choose a product…</option>' + Object.keys(CATALOG).sort().map(function (n) {
+      return '<option value="' + esc(n) + '">' + esc(n) + ' — ' + money(CATALOG[n].price) + '</option>';
+    }).join('');
+  }
+
+  function addItem() {
+    var id = ++itemSeq;
+    var div = document.createElement('div');
+    div.className = 'item';
+    div.setAttribute('data-id', id);
+    div.innerHTML =
+      '<div class="field"><label>Product</label><select class="iProd">' + productOptions() + '</select></div>' +
+      '<div class="field iVarWrap hidden"><label>Option</label><select class="iVar"></select></div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Quantity</label><input type="number" class="iQty" min="1" step="1" value="1" inputmode="numeric"></div>' +
+        '<div class="field" style="display:flex;align-items:flex-end"><button type="button" class="btn btn-light" style="padding:12px" onclick="removeItem(' + id + ')">Remove</button></div>' +
+      '</div>';
+    div.querySelector('.iProd').addEventListener('change', function () { onProduct(div); });
+    div.querySelector('.iVar').addEventListener('change', calc);
+    div.querySelector('.iQty').addEventListener('input', calc);
+    document.getElementById('items').appendChild(div);
+  }
+
+  function onProduct(div) {
+    var p = CATALOG[div.querySelector('.iProd').value];
+    var wrap = div.querySelector('.iVarWrap'), sel = div.querySelector('.iVar');
+    if (p && p.variants && p.variants.length) {
+      sel.innerHTML = '<option value="">Choose…</option>' + p.variants.map(function (v) {
+        return '<option value="' + esc(v) + '">' + esc(v) + '</option>';
+      }).join('');
+      wrap.classList.remove('hidden');
+    } else {
+      sel.innerHTML = '';
+      wrap.classList.add('hidden');
+    }
+    calc();
+  }
+
+  function removeItem(id) {
+    var list = document.getElementById('items');
+    var row = list.querySelector('[data-id="' + id + '"]');
+    if (!row) return;
+    row.parentNode.removeChild(row);
+    if (!list.children.length) addItem();
+    calc();
+  }
+
+  function readItems() {
+    return Array.prototype.map.call(document.querySelectorAll('#items .item'), function (div) {
+      return {
+        product: div.querySelector('.iProd').value,
+        variant: div.querySelector('.iVar').value,
+        qty: parseInt(div.querySelector('.iQty').value, 10) || 0
+      };
+    });
+  }
+
+  function calc() {
+    var t = 0;
+    readItems().forEach(function (it) {
+      var p = CATALOG[it.product];
+      if (p) t += p.price * Math.max(0, it.qty);
+    });
+    document.getElementById('totalTxt').textContent = money(t);
+  }
+
+  function sendInvoice() {
+    var company = document.getElementById('nCompany').value.trim();
+    var email = document.getElementById('nEmail').value.trim();
+    var items = readItems().filter(function (it) { return it.product; });
+    if (!company) return showMsg('newMsg', 'err', 'Enter the business name.');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg('newMsg', 'err', 'Enter a valid email — the invoice is sent there.');
+    if (!items.length) return showMsg('newMsg', 'err', 'Add at least one product.');
+    for (var i = 0; i < items.length; i++) {
+      var p = CATALOG[items[i].product];
+      if (p && p.variants && p.variants.length && !items[i].variant) return showMsg('newMsg', 'err', 'Choose an option for ' + items[i].product + '.');
+      if (!(items[i].qty >= 1)) return showMsg('newMsg', 'err', 'Check the quantity for ' + items[i].product + '.');
+    }
+    if (!confirm('Send this invoice to ' + email + '?')) return;
+
+    var btn = document.getElementById('sendBtn');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    api('partnerCreateInvoice', { company: company, email: email, items: items })
+      .then(function (d) {
+        btn.disabled = false; btn.textContent = 'Send invoice';
+        if (d.status !== 'success') return showMsg('newMsg', 'err', d.message || 'Could not send the invoice.');
+        if (d.held) showMsg('newMsg', 'warn', d.message);
+        else if (d.emailed === false) showMsg('newMsg', 'warn', 'Invoice ' + d.ref + " was created, but the email didn't go out — Ediz has been told and will send it.");
+        else showMsg('newMsg', 'ok', 'Invoice ' + d.ref + ' sent to ' + email + ". You'll be credited when they pay.");
+        document.getElementById('nCompany').value = '';
+        document.getElementById('nEmail').value = '';
+        document.getElementById('items').innerHTML = '';
+        itemSeq = 0;
+        addItem();
+        calc();
+        window.scrollTo(0, 0);
+      })
+      .catch(function (e) {
+        btn.disabled = false; btn.textContent = 'Send invoice';
+        if (e.message !== 'auth') showMsg('newMsg', 'err', "The connection dropped, so it may or may not have gone through. Check My referrals before sending it again.");
+      });
+  }
+
+  /* ── My referrals ── */
+
+  function pillStyle(s) {
+    if (/^Paid/.test(s)) return 'background:#f0faf5;color:#1a7a4c';
+    if (/^Owed/.test(s)) return 'background:#1a1a1a;color:#fff';
+    if (/check/i.test(s)) return 'background:#fff8e6;color:#8a6100';
+    return 'background:#f0f0ee;color:#666';
+  }
+
+  function loadMine() {
+    document.getElementById('invList').innerHTML = '<div class="empty">Loading…</div>';
+    document.getElementById('ordList').innerHTML = '';
+    api('partnerOverview').then(function (d) {
+      document.getElementById('mOwed').textContent = money(d.owed);
+      document.getElementById('mPending').textContent = money(d.pending);
+      document.getElementById('mPaid').textContent = money(d.paidToDate);
+      var inv = d.invoices || [], ord = d.orders || [];
+      document.getElementById('invList').innerHTML = inv.length ? inv.map(function (x) {
+        return '<div class="li"><div>' +
+            '<div class="n">' + esc(x.company) + '</div>' +
+            '<div class="m">' + esc(x.ref) + (x.date ? ' · ' + fmtDate(x.date) : '') + '</div>' +
+            '<span class="pill" style="' + pillStyle(x.status) + '">' + esc(x.status) + '</span>' +
+          '</div><div class="a">' + money(x.amount) + '</div></div>';
+      }).join('') : '<div class="empty">None waiting — invoices you send appear here until they\'re paid.</div>';
+      document.getElementById('ordList').innerHTML = ord.length ? ord.map(function (x) {
+        return '<div class="li"><div>' +
+            '<div class="n">' + esc(x.company) + '</div>' +
+            '<div class="m">' + (x.ref ? esc(x.ref) + ' · ' : '') + (x.date ? fmtDate(x.date) + ' · ' : '') + 'they paid ' + money(x.amount) + '</div>' +
+            '<span class="pill" style="' + pillStyle(x.commissionStatus) + '">' + esc(x.commissionStatus) + '</span>' +
+          '</div><div class="a">' + money(x.commission) + '</div></div>';
+      }).join('') : '<div class="empty">No paid orders yet — your commission shows here once a business you referred pays.</div>';
+    }).catch(function (e) {
+      if (e.message !== 'auth') document.getElementById('invList').innerHTML = '<div class="empty" style="color:#b3261e">Could not load — please try again.</div>';
+    });
+  }
+
+  document.getElementById('liPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') signIn(); });
+
+  // Signed in on this phone before? Re-check the saved details with the
+  // server before showing anything, so a reset password takes effect at once.
+  (function () {
+    var code = read(CODE_KEY), pw = read(PW_KEY);
+    if (!code || !pw) return;
+    document.getElementById('liCode').value = code;
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'partnerLogin', partnerCode: code, partnerPassword: pw }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.status === 'success') openApp(d);
+        else signOut(d.status === 'locked' ? d.message : '');
+      })
+      .catch(function () {});
+  })();
+</script>
+</body>
+</html>
