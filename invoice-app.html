@@ -44,7 +44,7 @@
   .field { margin-bottom: 12px; }
   .field:last-child { margin-bottom: 0; }
   .field label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
-  .field input[type=text], .field input[type=number] {
+  .field input[type=text], .field input[type=number], .field select {
     width: 100%; font-family: 'Figtree', sans-serif; font-size: 15px; padding: 12px 14px;
     border: 1px solid #e0e0dd; border-radius: 10px; background: #fff; color: #1a1a1a;
   }
@@ -239,6 +239,7 @@
     <button type="button" id="btnInvoice" class="active" onclick="setTab('invoice')">Invoice</button>
     <button type="button" id="btnBni" onclick="setTab('bni')">BNI Badges</button>
     <button type="button" id="btnPayRun" onclick="setTab('payrun')">Tagify</button>
+    <button type="button" id="btnPartners" onclick="setTab('partners')">Partners</button>
     <button type="button" id="btnStandalone" onclick="setTab('standalone')">Old Invoice</button>
   </div>
 
@@ -279,6 +280,10 @@
       <div class="field">
         <label>Email <span id="emailOptionalTag">(optional)</span></label>
         <input type="text" id="fEmail">
+      </div>
+      <div class="field">
+        <label>Referred by <span style="color:#999;font-weight:400">(partner — optional)</span></label>
+        <select id="fReferredBy"><option value="">— No partner —</option></select>
       </div>
 
       <!-- Paid-only customer fields -->
@@ -446,7 +451,26 @@
   </div>
 
   <!-- ══════════ TAGIFY PAY RUN — what's owed, what's outstanding ══════════ -->
+  <!-- ══════════ PARTNERS — referral commission ══════════ -->
+  <div id="partnersScreen" style="display:none">
+    <div id="partnersBody"></div>
+    <button type="button" class="add-item-btn" id="partnersRefreshBtn" onclick="loadPartnerLedger()" style="margin:6px 0 22px">Refresh</button>
+
+    <div class="card">
+      <div class="card-label">Add a partner</div>
+      <div class="field"><label>Name</label><input type="text" id="npName" placeholder="Lisa Turner"></div>
+      <div class="field"><label>Commission %</label><input type="number" id="npRate" placeholder="15" min="0" max="100" step="0.5"></div>
+      <div class="field"><label>Referral code <span style="color:#999;font-weight:400">(optional — for website checkout)</span></label><input type="text" id="npCode" placeholder="LISA"></div>
+      <div class="field"><label>Email <span style="color:#999;font-weight:400">(optional)</span></label><input type="text" id="npEmail"></div>
+      <div id="npError" style="font-size:13px;color:#e53e3e;margin:4px 0"></div>
+      <button class="generate-btn" id="npBtn" onclick="addPartner()" style="margin-top:10px">Add partner</button>
+    </div>
+  </div>
+
   <div id="payRunScreen" style="display:none">
+    <div id="pipelineSummary" style="font-size:12px;color:#999;margin:0 4px 10px;line-height:1.6"></div>
+    <div id="pipelineList" style="margin-bottom:26px"></div>
+
     <div id="payRunHeadline" style="background:#1a1a1a;color:#fff;border-radius:14px;padding:18px 20px;margin-bottom:14px">
       <div style="font-size:12px;opacity:.7;letter-spacing:.3px">TO PAY TAGIFY</div>
       <div style="font-size:34px;font-weight:700;line-height:1.2" id="payRunTotal">—</div>
@@ -496,6 +520,12 @@
     </div>
 
     <div class="field" style="display:flex;align-items:center;gap:8px;margin:14px 4px">
+      <input type="checkbox" id="saUnpaid" style="width:16px;height:16px;margin:0" onchange="onSaUnpaidChange()">
+      <label style="margin:0" for="saUnpaid">Payment still due</label>
+    </div>
+    <div style="font-size:12px;color:#999;margin:-6px 4px 10px;line-height:1.5" id="saUnpaidNote">Marked as PAID — a receipt for something already settled.</div>
+
+    <div class="field" style="display:flex;align-items:center;gap:8px;margin:0 4px 14px">
       <input type="checkbox" id="saSendEmail" style="width:16px;height:16px;margin:0">
       <label style="margin:0" for="saSendEmail">Email this to the customer</label>
     </div>
@@ -583,6 +613,9 @@
     // today), so the pending list would silently fail on first load and
     // only work once you manually pressed Refresh — a single, isolated call.
     loadPendingInvoices();
+    // Staggered rather than fired alongside the pending list, for the same
+    // concurrent-request flakiness described above; it retries once anyway.
+    setTimeout(loadPartners, 1200);
   }
 
   function submitLockScreen() {
@@ -694,13 +727,254 @@
     document.getElementById('btnBni').classList.toggle('active', t === 'bni');
     document.getElementById('btnStandalone').classList.toggle('active', t === 'standalone');
     document.getElementById('btnPayRun').classList.toggle('active', t === 'payrun');
+    document.getElementById('btnPartners').classList.toggle('active', t === 'partners');
     document.getElementById('invoiceScreen').style.display = (t === 'invoice') ? 'block' : 'none';
     document.getElementById('bniScreen').style.display = (t === 'bni') ? 'block' : 'none';
     document.getElementById('standaloneScreen').style.display = (t === 'standalone') ? 'block' : 'none';
     document.getElementById('payRunScreen').style.display = (t === 'payrun') ? 'block' : 'none';
+    document.getElementById('partnersScreen').style.display = (t === 'partners') ? 'block' : 'none';
+    if (t === 'partners') loadPartnerLedger();
     if (t === 'bni') loadBniChapters();
     if (t === 'standalone' && !document.getElementById('standaloneItemsList').children.length) addStandaloneItemRow();
-    if (t === 'payrun' && !document.getElementById('payRunBody').children.length) loadPayRun();
+    if (t === 'payrun' && !document.getElementById('payRunBody').children.length) { loadPipeline(); loadPayRun(); }
+  }
+
+  /* ═══════════════ REFERRAL PARTNERS ═══════════════ */
+
+  var PARTNERS = [];
+  var partnerLedgerCache = [];
+
+  // Selects a partner in the "Referred by" picker. If that name isn't an
+  // option (list not loaded yet, or the partner's since been deactivated) it's
+  // added, so an edit or conversion never silently drops a referral.
+  function setReferredBy_(name) {
+    var sel = document.getElementById('fReferredBy');
+    name = name || '';
+    if (name && !Array.prototype.some.call(sel.options, function (o) { return o.value === name; })) {
+      var opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    }
+    sel.value = name;
+  }
+
+  function loadPartners(retried) {
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listPartners', password: getPassword() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status !== 'success') throw new Error(data.message || 'failed');
+        PARTNERS = data.partners || [];
+        var sel = document.getElementById('fReferredBy');
+        var current = sel.value;
+        sel.innerHTML = '<option value="">— No partner —</option>' + PARTNERS
+          .filter(function (p) { return p.active; })
+          .map(function (p) { return '<option value="' + escapeHtml_(p.name) + '">' + escapeHtml_(p.name) + ' (' + p.rate + '%)</option>'; })
+          .join('');
+        setReferredBy_(current);
+      })
+      .catch(function () { if (!retried) setTimeout(function () { loadPartners(true); }, 2500); });
+  }
+
+  function addPartner() {
+    var err = document.getElementById('npError');
+    err.textContent = '';
+    var name = document.getElementById('npName').value.trim();
+    var rate = parseFloat(document.getElementById('npRate').value);
+    if (!name) { err.textContent = 'Enter a name.'; return; }
+    if (!(rate > 0 && rate <= 100)) { err.textContent = 'Enter a commission % between 0 and 100.'; return; }
+    var btn = document.getElementById('npBtn');
+    btn.disabled = true; btn.textContent = 'Adding…';
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({
+      action: 'addPartner', password: getPassword(), name: name, rate: rate,
+      code: document.getElementById('npCode').value.trim(),
+      email: document.getElementById('npEmail').value.trim()
+    }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false; btn.textContent = 'Add partner';
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') { err.textContent = data.message || 'Could not add partner.'; return; }
+        ['npName', 'npRate', 'npCode', 'npEmail'].forEach(function (id) { document.getElementById(id).value = ''; });
+        loadPartners();
+        loadPartnerLedger();
+      })
+      .catch(function () {
+        btn.disabled = false; btn.textContent = 'Add partner';
+        err.textContent = 'Could not add partner — check your connection.';
+      });
+  }
+
+  function partnerOrderRow_(o) {
+    var d = '';
+    try { d = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0ee">' +
+        '<div style="min-width:0;flex:1">' +
+          '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml_(o.company) + '</div>' +
+          '<div style="font-size:11px;color:#999">' + escapeHtml_(o.customerRef || ('#' + o.orderNumber)) +
+            (o.isWebsite ? ' · Website' : '') + (d ? ' · ' + d : '') +
+            ' · paid £' + parseFloat(o.revenue || 0).toFixed(2) +
+            (o.paymentStatus && o.paymentStatus !== 'Paid in full' ? ' · ' + escapeHtml_(o.paymentStatus) : '') +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:13px;font-weight:600;white-space:nowrap">£' + parseFloat(o.commission || 0).toFixed(2) + '</div>' +
+      '</div>';
+  }
+
+  function loadPartnerLedger() {
+    var body = document.getElementById('partnersBody');
+    var btn = document.getElementById('partnersRefreshBtn');
+    btn.disabled = true; btn.textContent = 'Loading…';
+    body.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">Loading…</div>';
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'partnerLedger', password: getPassword() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false; btn.textContent = 'Refresh';
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          body.innerHTML = '<div style="font-size:13px;color:#e53e3e">' + escapeHtml_(data.message || 'Could not load.') + '</div>';
+          return;
+        }
+        partnerLedgerCache = data.partners || [];
+        if (!partnerLedgerCache.length) {
+          body.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">No partners yet — add one below.</div>';
+          return;
+        }
+        body.innerHTML = partnerLedgerCache.map(function (p, i) {
+          return '<div class="card" style="margin-bottom:14px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
+              '<div style="font-size:15px;font-weight:700">' + escapeHtml_(p.name) + '</div>' +
+              '<div style="font-size:12px;color:#999">' + p.rate + '%' + (p.code ? ' · code ' + escapeHtml_(p.code) : '') + (p.active ? '' : ' · inactive') + '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:18px;margin:10px 0 12px">' +
+              '<div><div style="font-size:11px;color:#999">OWED NOW</div><div style="font-size:24px;font-weight:700">£' + p.owed.toFixed(2) + '</div></div>' +
+              '<div><div style="font-size:11px;color:#999">PENDING</div><div style="font-size:15px;font-weight:600;color:#8a6100;margin-top:6px">£' + p.pending.toFixed(2) + '</div></div>' +
+              '<div><div style="font-size:11px;color:#999">PAID TO DATE</div><div style="font-size:15px;font-weight:600;color:#1a7a4c;margin-top:6px">£' + p.paidToDate.toFixed(2) + '</div></div>' +
+            '</div>' +
+            (p.owedOrders.length
+              ? p.owedOrders.map(partnerOrderRow_).join('') +
+                '<button type="button" class="generate-btn" style="margin-top:12px" onclick="recordPartnerPayout(' + i + ')">Record payout to ' + escapeHtml_(p.name.split(' ')[0]) + '</button>'
+              : '<div style="font-size:12px;color:#999">Nothing owed right now.</div>') +
+            (p.pendingOrders.length
+              ? '<div style="font-size:11px;color:#999;margin:14px 0 2px">WAITING ON THE CUSTOMER TO PAY IN FULL</div>' + p.pendingOrders.map(partnerOrderRow_).join('')
+              : '') +
+          '</div>';
+        }).join('');
+      })
+      .catch(function () {
+        btn.disabled = false; btn.textContent = 'Refresh';
+        body.innerHTML = '<div style="font-size:13px;color:#e53e3e">Could not load — please try again.</div>';
+      });
+  }
+
+  // Settles exactly the orders shown when the tab loaded (snapshot), so an
+  // order that lands while you're paying her can't be swept into the batch.
+  function recordPartnerPayout(i) {
+    var p = partnerLedgerCache[i];
+    if (!p || !p.owedOrders.length) return;
+    var entered = prompt(
+      'How much did you pay ' + p.name + '?\n\n' + p.owedOrders.length + ' order(s), £' + p.owed.toFixed(2) + ' owed.\n' +
+      'Change it if you paid a different amount.', p.owed.toFixed(2));
+    if (entered === null) return;
+    var amount = parseFloat(String(entered).replace(/[^0-9.\-]/g, ''));
+    if (!(amount > 0)) { alert('Enter a valid amount.'); return; }
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({
+      action: 'recordPartnerPayout', password: getPassword(), partner: p.name, amount: amount,
+      orders: p.owedOrders.map(function (o) { return o.orderNumber; })
+    }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') alert(data.message || 'Could not record payout.');
+        loadPartnerLedger();
+      })
+      .catch(function () { alert('Could not record payout — check your connection.'); loadPartnerLedger(); });
+  }
+
+  /* ═══════════════ ORDER PIPELINE ═══════════════ */
+
+  // Four facts per order. Colour carries the meaning at a glance; the label
+  // under each row says the one thing that's actually blocking it.
+  var PIPELINE_STEPS = [
+    { key: 'logo',    label: 'Logo' },
+    { key: 'artwork', label: 'Artwork' },
+    { key: 'sent',    label: 'Sent' },
+    { key: 'made',    label: 'Made' }
+  ];
+
+  var PIPELINE_NEXT_COLOR = {
+    'Waiting on logo': '#b3261e',
+    'Design it':       '#8a6100',
+    'Send to Tagify':  '#1d4ed8',
+    'With Tagify':     '#1a7a4c'
+  };
+
+  function pipelineDots_(o) {
+    return PIPELINE_STEPS.map(function (s) {
+      // "made" is never true here — an order that's made drops off the list
+      // entirely — so it always shows as the outstanding final step.
+      var done = s.key === 'made' ? false : !!o[s.key];
+      return '<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:11px;color:' +
+          (done ? '#1a7a4c' : '#bbb') + '">' +
+        '<span style="width:9px;height:9px;border-radius:50%;background:' +
+          (done ? '#1a7a4c' : '#e2e2df') + ';display:inline-block"></span>' +
+        escapeHtml_(s.label) +
+      '</span>';
+    }).join('');
+  }
+
+  function loadPipeline() {
+    var list = document.getElementById('pipelineList');
+    var summary = document.getElementById('pipelineSummary');
+    list.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">Checking orders…</div>';
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'orderPipeline', password: getPassword() })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          list.innerHTML = '<div style="font-size:13px;color:#e53e3e">' + escapeHtml_(data.message || 'Could not load.') + '</div>';
+          return;
+        }
+
+        var c = data.counts || {};
+        var orders = data.orders || [];
+        summary.innerHTML = '<b style="color:#1a1a1a;font-size:13px">' + orders.length + ' order' +
+          (orders.length === 1 ? '' : 's') + ' on the go</b><br>' +
+          (c.logo ? '<span style="color:#b3261e">' + c.logo + ' waiting on logo</span> · ' : '') +
+          (c.design ? '<span style="color:#8a6100">' + c.design + ' to design</span> · ' : '') +
+          (c.send ? '<span style="color:#1d4ed8">' + c.send + ' to send</span> · ' : '') +
+          (c.tagify || 0) + ' with Tagify';
+
+        if (!orders.length) {
+          list.innerHTML = '<div style="font-size:14px;color:#1a7a4c;font-weight:600;padding:8px 0">Nothing outstanding.</div>';
+          return;
+        }
+
+        list.innerHTML = orders.map(function (o) {
+          var dateStr = '';
+          try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
+          var age = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+          var col = PIPELINE_NEXT_COLOR[o.next] || '#666';
+          return '<div style="padding:11px 0;border-bottom:1px solid #f0f0ee">' +
+              '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">' +
+                '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                  escapeHtml_(o.company) + '</div>' +
+                '<div style="font-size:11px;font-weight:700;color:' + col + ';white-space:nowrap">' +
+                  escapeHtml_(o.next) + '</div>' +
+              '</div>' +
+              '<div style="font-size:11px;color:#999;margin:2px 0 6px">#' + escapeHtml_(o.invoiceNumber) +
+                (o.isWebsite ? ' · Website' : '') + (dateStr ? ' · ' + dateStr : '') +
+                (age !== null && age > 0 ? ' · ' + age + 'd' : '') + '</div>' +
+              '<div>' + pipelineDots_(o) + '</div>' +
+            '</div>';
+        }).join('');
+      })
+      .catch(function () {
+        list.innerHTML = '<div style="font-size:13px;color:#e53e3e">Could not load — please try again.</div>';
+      });
   }
 
   /* ═══════════════ TAGIFY PAY RUN ═══════════════ */
@@ -817,6 +1091,7 @@
     btn.disabled = true;
     btn.textContent = 'Loading…';
     body.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">Loading…</div>';
+    loadPipeline();
 
     fetch(SCRIPT_URL, {
       method: 'POST',
@@ -968,6 +1243,13 @@
     return total;
   }
 
+  function onSaUnpaidChange() {
+    var unpaid = document.getElementById('saUnpaid').checked;
+    document.getElementById('saUnpaidNote').textContent = unpaid
+      ? 'Marked PAYMENT PENDING, shows "Total due" and your bank details — what a customer\'s accounts team needs to raise payment.'
+      : 'Marked as PAID — a receipt for something already settled.';
+  }
+
   function generateStandaloneInvoice() {
     var errorEl = document.getElementById('standaloneErrorMsg');
     errorEl.textContent = '';
@@ -1002,6 +1284,7 @@
         company: company, email: email, invoiceNumber: ref,
         address: document.getElementById('saAddress').value.trim(),
         date: document.getElementById('saDate').value || undefined,
+        isPaid: !document.getElementById('saUnpaid').checked,
         items: items, sendEmail: sendEmail
       })
     })
@@ -1045,7 +1328,7 @@
     var checked = document.getElementById('fIncludeLink').checked;
     document.getElementById('fPayLinkWrap').style.display = checked ? 'block' : 'none';
     document.getElementById('payLinkNote').textContent = checked
-      ? 'Drafts are always sent as proformas — no real invoice number yet. Switch to "Paid" above once money\'s actually landed.'
+      ? 'Issued as a real invoice with an INV- number. The customer keeps that same number when they pay — switch to "Paid" above once the money lands.'
       : 'No payment link will be included on this invoice — bank transfer will be the only way to pay.';
   }
 
@@ -1228,7 +1511,7 @@
         // just reachable straight from search, no scrolling/tab-switching
         // needed to find the same draft again.
         row.querySelector('.mark-paid-btn').addEventListener('click', function () {
-          startConvertDraft({ ref: o.draftRef, company: o.company, email: o.email, items: o.items, discount: o.discount });
+          startConvertDraft({ ref: o.draftRef, company: o.company, email: o.email, items: o.items, discount: o.discount, referredBy: o.referredBy });
         });
       } else {
         row.querySelector('.retry-order-btn').addEventListener('click', function () {
@@ -1398,7 +1681,8 @@
     var email = document.getElementById('fEmail').value.trim();
     var phone = document.getElementById('coPhone') ? document.getElementById('coPhone').value.trim() : '';
     var address = document.getElementById('coAddress') ? document.getElementById('coAddress').value.trim() : '';
-    if (email && phone && address) return; // every field already filled — nothing to fill
+    var refPick = document.getElementById('fReferredBy');
+    if (email && phone && address && refPick.value) return; // every field already filled — nothing to fill
 
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'searchOrders', password: getPassword(), query: company }) })
       .then(function (r) { return r.json(); })
@@ -1417,6 +1701,14 @@
         if (phoneEl && match.phone && !phoneEl.value.trim()) { phoneEl.value = match.phone; filled.push('phone'); }
         var addressEl = document.getElementById('coAddress');
         if (addressEl && match.address && !addressEl.value.trim()) { addressEl.value = match.address; filled.push('address'); }
+        // "Every order, forever": a customer a partner referred stays theirs. Exact
+        // company match only — the search is a substring match, and a commission
+        // must never be credited because two company names happen to overlap.
+        var typedCo = company.toLowerCase();
+        var referral = (data.orders.filter(function (o) {
+          return o.referredBy && String(o.company || '').trim().toLowerCase() === typedCo;
+        })[0] || {}).referredBy;
+        if (referral && !refPick.value) { setReferredBy_(referral); filled.push('referral (' + referral + ')'); }
 
         if (filled.length) {
           var dateStr = '';
@@ -1944,6 +2236,7 @@
     document.getElementById('fPayLink').value = '';
     document.getElementById('fIncludeLink').checked = true;
     onIncludeLinkChange();
+    setReferredBy_(inv.referredBy);
     document.getElementById('coDiscount').value = inv.discount ? inv.discount : '';
     document.getElementById('coDiscUnitFlat').checked = true;
 
@@ -1983,6 +2276,7 @@
     // Defaults to "Paid in full" (the common case for closing out a draft),
     // but it's just the default pill selection — switch to "Deposit paid" or
     // "Pay on delivery" below if this one hasn't actually been paid yet.
+    setReferredBy_(inv.referredBy);
     resetPayStatus_();
     // Discount is the same shared field as Draft mode — set explicitly from
     // the draft's own discount rather than leaving whatever was already
@@ -2158,7 +2452,8 @@
       payLink:       document.getElementById('fPayLink').value.trim(),
       includeLink:   document.getElementById('fIncludeLink').checked,
       discount:      computeDiscountAmount_(draftGrossTotal),
-      discountLabel: discountLabel_()
+      discountLabel: discountLabel_(),
+      referredBy:    document.getElementById('fReferredBy').value
     };
     if (isEdit) payload.ref = editingDraftRef;
     if (pendingBniChapter) payload.bniChapter = pendingBniChapter;
@@ -2169,7 +2464,7 @@
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'failed');
 
-        document.getElementById('successTitle').textContent = isEdit ? 'Draft invoice updated' : 'Draft invoice created';
+        document.getElementById('successTitle').textContent = isEdit ? 'Invoice updated' : 'Invoice issued';
         document.getElementById('successRef').textContent = data.reference;
 
         var blob = base64ToBlob(data.pdfBase64, 'application/pdf');
@@ -2247,6 +2542,7 @@
     document.getElementById('fPayLink').value = '';
     document.getElementById('fIncludeLink').checked = true;
     onIncludeLinkChange();
+    setReferredBy_('');
     document.getElementById('coDiscount').value = '';
     document.getElementById('coDiscUnitFlat').checked = true;
     document.getElementById('itemsContainer').innerHTML = '';
@@ -2523,7 +2819,8 @@
       discount:      computeDiscountAmount_(grossTotal),
       discountLabel: discountLabel_(),
       depositAmount: depositAmountVal,
-      orderKey:      currentOrderKey
+      orderKey:      currentOrderKey,
+      referredBy:    document.getElementById('fReferredBy').value
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
 
@@ -2582,6 +2879,7 @@
     document.getElementById('coAddress').value = '';
     document.getElementById('coSource').value = '';
     document.getElementById('coNotes').value = '';
+    setReferredBy_('');
     document.getElementById('coDiscount').value = '';
     document.getElementById('coDiscUnitFlat').checked = true;
     document.querySelectorAll('input[name="coPay"], input[name="coFulfilment"], input[name="coSourceType"]').forEach(function (r) { r.checked = false; });
