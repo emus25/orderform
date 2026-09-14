@@ -19,9 +19,12 @@
 
   .page { padding: 24px 18px 60px; max-width: 520px; margin: 0 auto; }
 
-  .toggle { display: flex; background: #fff; border: 1px solid #e0e0dd; border-radius: 10px; padding: 4px; margin-bottom: 20px; }
+  /* Wraps onto a second row rather than squashing: six tabs no longer fit
+     across a phone (measured 53px of overflow at 390px wide). min-width is
+     what decides when it wraps, so a wide screen still shows one row. */
+  .toggle { display: flex; flex-wrap: wrap; gap: 2px; background: #fff; border: 1px solid #e0e0dd; border-radius: 10px; padding: 4px; margin-bottom: 20px; }
   .toggle button {
-    flex: 1; border: none; background: transparent; padding: 10px; border-radius: 8px;
+    flex: 1 1 auto; min-width: 92px; white-space: nowrap; border: none; background: transparent; padding: 10px; border-radius: 8px;
     font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; color: #888; cursor: pointer;
   }
   .toggle button.active { background: #1a1a1a; color: #fff; }
@@ -238,6 +241,7 @@
   <div class="toggle" id="tabToggle">
     <button type="button" id="btnInvoice" class="active" onclick="setTab('invoice')">Invoice</button>
     <button type="button" id="btnBni" onclick="setTab('bni')">BNI Badges</button>
+    <button type="button" id="btnCurrent" onclick="setTab('current')">Current</button>
     <button type="button" id="btnPayRun" onclick="setTab('payrun')">Tagify</button>
     <button type="button" id="btnPartners" onclick="setTab('partners')">Partners</button>
     <button type="button" id="btnStandalone" onclick="setTab('standalone')">Old Invoice</button>
@@ -272,6 +276,13 @@
     <div class="error-msg" id="errorMsg"></div>
 
     <div class="card">
+      <!-- Quick fire vs full invoice. A company's accounts department won't pay
+           against a document with no address or PO on it; a BNI one-off needs
+           none of that. Same form, extra fields revealed. -->
+      <div class="toggle mode-toggle" id="detailToggle" style="margin-bottom:14px">
+        <button type="button" id="btnDetailQuick" class="active" onclick="setInvoiceDetail('quick')">Quick invoice</button>
+        <button type="button" id="btnDetailFull" onclick="setInvoiceDetail('full')">Full invoice</button>
+      </div>
       <div class="field">
         <label>Company / customer name</label>
         <input type="text" id="fCompany" onblur="suggestAutofillFromHistory()">
@@ -284,6 +295,30 @@
       <div class="field">
         <label>Referred by <span style="color:#999;font-weight:400">(partner — optional)</span></label>
         <select id="fReferredBy"><option value="">— No partner —</option></select>
+      </div>
+
+      <!-- Full invoice only -->
+      <div id="fullInvoiceFields" style="display:none">
+        <div class="field">
+          <label>Contact name <span style="color:#999;font-weight:400">(optional)</span></label>
+          <input type="text" id="fContact" placeholder="Sarah Ahmed" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Phone <span style="color:#999;font-weight:400">(optional)</span></label>
+          <input type="tel" id="fPhone" placeholder="+44 7700 000000" inputmode="tel">
+        </div>
+        <div class="field">
+          <label>Billing address</label>
+          <textarea class="quickline" id="fAddress" style="min-height:72px" placeholder="Croner UK&#10;Wheatfield Way&#10;Hinckley LE10 1YG"></textarea>
+        </div>
+        <div class="field">
+          <label>Their reference / PO number <span style="color:#999;font-weight:400">(optional)</span></label>
+          <input type="text" id="fCustomerRef" placeholder="PO-48213">
+        </div>
+        <div class="field">
+          <label>Notes on the invoice <span style="color:#999;font-weight:400">(optional)</span></label>
+          <textarea class="quickline" id="fNotes" style="min-height:72px" placeholder="Delivery week commencing 29 September. Artwork approved by Sarah on 12/09."></textarea>
+        </div>
       </div>
 
       <!-- Paid-only customer fields -->
@@ -467,10 +502,17 @@
     </div>
   </div>
 
-  <div id="payRunScreen" style="display:none">
-    <div id="pipelineSummary" style="font-size:12px;color:#999;margin:0 4px 10px;line-height:1.6"></div>
-    <div id="pipelineList" style="margin-bottom:26px"></div>
+  <!-- ══════════ CURRENT ORDERS — held until the artwork is done ══════════ -->
+  <div id="currentScreen" style="display:none">
+    <div class="card-label" style="margin:0 4px 4px">Awaiting artwork</div>
+    <div style="font-size:12px;color:#999;margin:0 4px 12px;line-height:1.5">
+      Nothing goes to NFC Tagify until you say the artwork is done. Website and in-person orders both land here.
+    </div>
+    <button type="button" class="add-item-btn" id="currentRefreshBtn" onclick="loadCurrentOrders()" style="margin-bottom:14px">Refresh</button>
+    <div id="currentList" style="margin-bottom:26px"></div>
+  </div>
 
+  <div id="payRunScreen" style="display:none">
     <div id="payRunHeadline" style="background:#1a1a1a;color:#fff;border-radius:14px;padding:18px 20px;margin-bottom:14px">
       <div style="font-size:12px;opacity:.7;letter-spacing:.3px">TO PAY TAGIFY</div>
       <div style="font-size:34px;font-weight:700;line-height:1.2" id="payRunTotal">—</div>
@@ -728,16 +770,19 @@
     document.getElementById('btnBni').classList.toggle('active', t === 'bni');
     document.getElementById('btnStandalone').classList.toggle('active', t === 'standalone');
     document.getElementById('btnPayRun').classList.toggle('active', t === 'payrun');
+    document.getElementById('btnCurrent').classList.toggle('active', t === 'current');
     document.getElementById('btnPartners').classList.toggle('active', t === 'partners');
     document.getElementById('invoiceScreen').style.display = (t === 'invoice') ? 'block' : 'none';
     document.getElementById('bniScreen').style.display = (t === 'bni') ? 'block' : 'none';
     document.getElementById('standaloneScreen').style.display = (t === 'standalone') ? 'block' : 'none';
     document.getElementById('payRunScreen').style.display = (t === 'payrun') ? 'block' : 'none';
+    document.getElementById('currentScreen').style.display = (t === 'current') ? 'block' : 'none';
     document.getElementById('partnersScreen').style.display = (t === 'partners') ? 'block' : 'none';
     if (t === 'partners') loadPartnerLedger();
     if (t === 'bni') loadBniChapters();
     if (t === 'standalone' && !document.getElementById('standaloneItemsList').children.length) addStandaloneItemRow();
-    if (t === 'payrun' && !document.getElementById('payRunBody').children.length) { loadPipeline(); loadPayRun(); }
+    if (t === 'payrun' && !document.getElementById('payRunBody').children.length) loadPayRun();
+    if (t === 'current') loadCurrentOrders();
   }
 
   /* ═══════════════ REFERRAL PARTNERS ═══════════════ */
@@ -913,6 +958,94 @@
 
   // Keeps the partner portal's price list in step with CATALOG_DATA — the one
   // place prices are defined. The server keeps name/price/options only.
+  /* ═══════════════ CURRENT ORDERS ═══════════════ */
+
+  // Orders are held back from Tagify from the moment they're created (website
+  // and in person alike) — he only wants an order once its artwork is ready to
+  // produce. This is the list of what's held, and one button per order sends it.
+  function loadCurrentOrders() {
+    var btn = document.getElementById('currentRefreshBtn');
+    var list = document.getElementById('currentList');
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    list.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">Loading…</div>';
+
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'currentOrders', password: getPassword() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          list.innerHTML = '<div style="font-size:13px;color:#e53e3e">' + escapeHtml_(data.message || 'Could not load.') + '</div>';
+          return;
+        }
+
+        var orders = data.orders || [];
+        if (!orders.length) {
+          list.innerHTML = '<div style="font-size:14px;color:#1a7a4c;font-weight:600;padding:8px 0">Nothing waiting — every order is with Tagify.</div>';
+          return;
+        }
+
+        list.innerHTML = orders.map(function (o, i) {
+          var dateStr = '';
+          try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
+          var age = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+          var unpaid = /unpaid/i.test(o.status || '');
+          return '<div style="padding:12px 0;border-bottom:1px solid #f0f0ee" id="curRow' + i + '">' +
+              '<div style="font-size:14px;font-weight:600">' + escapeHtml_(o.company) + '</div>' +
+              '<div style="font-size:11px;color:#999;margin:2px 0 6px">#' + escapeHtml_(o.invoiceNumber) +
+                (o.isWebsite ? ' · Website' : '') + (dateStr ? ' · ' + dateStr : '') +
+                (age !== null && age > 0 ? ' · ' + age + 'd' : '') +
+                (unpaid ? ' · <span style="color:#b3261e;font-weight:700">UNPAID</span>' : '') + '</div>' +
+              '<div style="font-size:12px;color:#666;margin-bottom:8px;line-height:1.5">' + escapeHtml_(o.items || '') + '</div>' +
+              '<button type="button" class="add-item-btn" style="padding:8px 14px;font-size:13px" ' +
+                'onclick="artworkUploaded(this,' + i + ',\'' + escapeHtml_(o.invoiceNumber) + '\',' + (o.isWebsite ? 'true' : 'false') + ',' + (unpaid ? 'true' : 'false') + ')">' +
+                'Artwork uploaded &rarr; send to Tagify</button>' +
+            '</div>';
+        }).join('');
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+        list.innerHTML = '<div style="font-size:13px;color:#e53e3e">Could not load — please try again.</div>';
+      });
+  }
+
+  // Sends that one order to Tagify. The row reports back in place — no email,
+  // nothing else to check.
+  function artworkUploaded(btn, i, invNum, isWebsite, unpaid) {
+    if (unpaid && !confirm('Order #' + invNum + ' isn\'t marked as paid.\n\nSend it to Tagify anyway?')) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'artworkReady', password: getPassword(), invoiceNumber: invNum, isWebsite: !!isWebsite })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        var st = data.tagifyStatus || '';
+        if (data.status !== 'success' || !/^Forwarded/.test(st)) {
+          btn.disabled = false;
+          btn.textContent = 'Try again';
+          var row = document.getElementById('curRow' + i);
+          if (row) row.insertAdjacentHTML('beforeend',
+            '<div style="font-size:12px;color:#e53e3e;margin-top:6px">' + escapeHtml_(st || data.message || 'Could not send.') + '</div>');
+          return;
+        }
+        var row2 = document.getElementById('curRow' + i);
+        if (row2) row2.innerHTML = '<div style="padding:12px 0;font-size:13px;color:#1a7a4c;font-weight:600">' +
+          '#' + escapeHtml_(invNum) + ' sent to Tagify ✓</div>';
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Try again';
+        alert('Could not send: ' + err.message);
+      });
+  }
+
   function syncCatalogToServer() {
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'syncCatalog', password: getPassword(), catalog: CATALOG_DATA }) })
       .catch(function () {});
@@ -952,91 +1085,6 @@
   }
 
   /* ═══════════════ ORDER PIPELINE ═══════════════ */
-
-  // Four facts per order. Colour carries the meaning at a glance; the label
-  // under each row says the one thing that's actually blocking it.
-  var PIPELINE_STEPS = [
-    { key: 'logo',    label: 'Logo' },
-    { key: 'artwork', label: 'Artwork' },
-    { key: 'sent',    label: 'Sent' },
-    { key: 'made',    label: 'Made' }
-  ];
-
-  var PIPELINE_NEXT_COLOR = {
-    'Waiting on logo': '#b3261e',
-    'Design it':       '#8a6100',
-    'Send to Tagify':  '#1d4ed8',
-    'With Tagify':     '#1a7a4c'
-  };
-
-  function pipelineDots_(o) {
-    return PIPELINE_STEPS.map(function (s) {
-      // "made" is never true here — an order that's made drops off the list
-      // entirely — so it always shows as the outstanding final step.
-      var done = s.key === 'made' ? false : !!o[s.key];
-      return '<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:11px;color:' +
-          (done ? '#1a7a4c' : '#bbb') + '">' +
-        '<span style="width:9px;height:9px;border-radius:50%;background:' +
-          (done ? '#1a7a4c' : '#e2e2df') + ';display:inline-block"></span>' +
-        escapeHtml_(s.label) +
-      '</span>';
-    }).join('');
-  }
-
-  function loadPipeline() {
-    var list = document.getElementById('pipelineList');
-    var summary = document.getElementById('pipelineSummary');
-    list.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">Checking orders…</div>';
-
-    fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'orderPipeline', password: getPassword() })
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
-        if (data.status !== 'success') {
-          list.innerHTML = '<div style="font-size:13px;color:#e53e3e">' + escapeHtml_(data.message || 'Could not load.') + '</div>';
-          return;
-        }
-
-        var c = data.counts || {};
-        var orders = data.orders || [];
-        summary.innerHTML = '<b style="color:#1a1a1a;font-size:13px">' + orders.length + ' order' +
-          (orders.length === 1 ? '' : 's') + ' on the go</b><br>' +
-          (c.logo ? '<span style="color:#b3261e">' + c.logo + ' waiting on logo</span> · ' : '') +
-          (c.design ? '<span style="color:#8a6100">' + c.design + ' to design</span> · ' : '') +
-          (c.send ? '<span style="color:#1d4ed8">' + c.send + ' to send</span> · ' : '') +
-          (c.tagify || 0) + ' with Tagify';
-
-        if (!orders.length) {
-          list.innerHTML = '<div style="font-size:14px;color:#1a7a4c;font-weight:600;padding:8px 0">Nothing outstanding.</div>';
-          return;
-        }
-
-        list.innerHTML = orders.map(function (o) {
-          var dateStr = '';
-          try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
-          var age = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
-          var col = PIPELINE_NEXT_COLOR[o.next] || '#666';
-          return '<div style="padding:11px 0;border-bottom:1px solid #f0f0ee">' +
-              '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">' +
-                '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-                  escapeHtml_(o.company) + '</div>' +
-                '<div style="font-size:11px;font-weight:700;color:' + col + ';white-space:nowrap">' +
-                  escapeHtml_(o.next) + '</div>' +
-              '</div>' +
-              '<div style="font-size:11px;color:#999;margin:2px 0 6px">#' + escapeHtml_(o.invoiceNumber) +
-                (o.isWebsite ? ' · Website' : '') + (dateStr ? ' · ' + dateStr : '') +
-                (age !== null && age > 0 ? ' · ' + age + 'd' : '') + '</div>' +
-              '<div>' + pipelineDots_(o) + '</div>' +
-            '</div>';
-        }).join('');
-      })
-      .catch(function () {
-        list.innerHTML = '<div style="font-size:13px;color:#e53e3e">Could not load — please try again.</div>';
-      });
-  }
 
   /* ═══════════════ TAGIFY PAY RUN ═══════════════ */
 
@@ -1152,7 +1200,6 @@
     btn.disabled = true;
     btn.textContent = 'Loading…';
     body.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">Loading…</div>';
-    loadPipeline();
 
     fetch(SCRIPT_URL, {
       method: 'POST',
@@ -1393,6 +1440,18 @@
       : 'No payment link will be included on this invoice — bank transfer will be the only way to pay.';
   }
 
+  // Quick fire vs full invoice — purely which fields are on show. Anything
+  // typed into the full fields is still sent if you switch back, so flipping
+  // between them can never quietly drop an address you've already entered.
+  var invoiceDetail = 'quick';
+
+  function setInvoiceDetail(mode) {
+    invoiceDetail = (mode === 'full') ? 'full' : 'quick';
+    document.getElementById('btnDetailQuick').classList.toggle('active', invoiceDetail === 'quick');
+    document.getElementById('btnDetailFull').classList.toggle('active', invoiceDetail === 'full');
+    document.getElementById('fullInvoiceFields').style.display = (invoiceDetail === 'full') ? 'block' : 'none';
+  }
+
   function setMode(m) {
     invoiceMode = m;
     document.getElementById('btnModeDraft').classList.toggle('active', m === 'draft');
@@ -1409,6 +1468,11 @@
     document.querySelectorAll('.paid-only').forEach(function (el) { el.style.display = (m === 'paid') ? 'block' : 'none'; });
     document.getElementById('confirmedInvBadge').style.display = (m === 'paid') ? 'inline-block' : 'none';
     document.getElementById('emailOptionalTag').style.display = (m === 'paid') ? 'none' : 'inline';
+    // Paid mode has its own contact/address/notes fields, so the draft-only
+    // switch and its fields stay out of the way there.
+    document.getElementById('detailToggle').style.display = (m === 'draft') ? 'flex' : 'none';
+    document.getElementById('fullInvoiceFields').style.display =
+      (m === 'draft' && invoiceDetail === 'full') ? 'block' : 'none';
 
     if (m === 'draft') {
       document.getElementById('generateBtn').textContent = editingDraftRef ? 'Save Changes' : 'Create Draft Invoice';
@@ -2298,6 +2362,12 @@
     document.getElementById('fIncludeLink').checked = true;
     onIncludeLinkChange();
     setReferredBy_(inv.referredBy);
+    document.getElementById('fContact').value = inv.contactName || '';
+    document.getElementById('fPhone').value = inv.phone || '';
+    document.getElementById('fAddress').value = inv.address || '';
+    document.getElementById('fCustomerRef').value = inv.customerRef || '';
+    document.getElementById('fNotes').value = inv.notes || '';
+    setInvoiceDetail((inv.address || inv.contactName || inv.phone || inv.customerRef || inv.notes) ? 'full' : 'quick');
     document.getElementById('coDiscount').value = inv.discount ? inv.discount : '';
     document.getElementById('coDiscUnitFlat').checked = true;
 
@@ -2514,7 +2584,12 @@
       includeLink:   document.getElementById('fIncludeLink').checked,
       discount:      computeDiscountAmount_(draftGrossTotal),
       discountLabel: discountLabel_(),
-      referredBy:    document.getElementById('fReferredBy').value
+      referredBy:    document.getElementById('fReferredBy').value,
+      contactName:   document.getElementById('fContact').value.trim(),
+      phone:         document.getElementById('fPhone').value.trim(),
+      address:       document.getElementById('fAddress').value.trim(),
+      customerRef:   document.getElementById('fCustomerRef').value.trim(),
+      notes:         document.getElementById('fNotes').value.trim()
     };
     if (isEdit) payload.ref = editingDraftRef;
     if (pendingBniChapter) payload.bniChapter = pendingBniChapter;
@@ -2600,6 +2675,12 @@
     document.getElementById('quickline').value = '';
     document.getElementById('fCompany').value = '';
     document.getElementById('fEmail').value = '';
+    document.getElementById('fContact').value = '';
+    document.getElementById('fPhone').value = '';
+    document.getElementById('fAddress').value = '';
+    document.getElementById('fCustomerRef').value = '';
+    document.getElementById('fNotes').value = '';
+    setInvoiceDetail('quick');
     document.getElementById('fPayLink').value = '';
     document.getElementById('fIncludeLink').checked = true;
     onIncludeLinkChange();
