@@ -993,7 +993,15 @@
           var age = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
           var unpaid = /unpaid/i.test(o.status || '');
           return '<div style="padding:12px 0;border-bottom:1px solid #f0f0ee" id="curRow' + i + '">' +
-              '<div style="font-size:14px;font-weight:600">' + escapeHtml_(o.company) + '</div>' +
+              // Clear sits up on the name row: down beside the send button it read
+              // as a second step in sending, which is the opposite of what it does.
+              '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
+                '<div style="font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                  escapeHtml_(o.company) + '</div>' +
+                '<button type="button" onclick="clearCurrentOrder(this,' + i + ',\'' + escapeHtml_(o.invoiceNumber) + '\')" ' +
+                  'style="font-size:12px;color:#999;background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;white-space:nowrap">' +
+                  'Clear</button>' +
+              '</div>' +
               '<div style="font-size:11px;color:#999;margin:2px 0 6px">#' + escapeHtml_(o.invoiceNumber) +
                 (o.isWebsite ? ' · Website' : '') + (dateStr ? ' · ' + dateStr : '') +
                 (age !== null && age > 0 ? ' · ' + age + 'd' : '') +
@@ -1002,9 +1010,6 @@
               '<button type="button" class="add-item-btn" style="padding:8px 14px;font-size:13px" ' +
                 'onclick="artworkUploaded(this,' + i + ',\'' + escapeHtml_(o.invoiceNumber) + '\',' + (o.isWebsite ? 'true' : 'false') + ',' + (unpaid ? 'true' : 'false') + ')">' +
                 'Artwork uploaded &rarr; send to Tagify</button>' +
-              '<button type="button" onclick="clearCurrentOrder(this,' + i + ',\'' + escapeHtml_(o.invoiceNumber) + '\')" ' +
-                'style="font-size:12px;color:#888;background:none;border:none;padding:8px 0 0 14px;cursor:pointer;text-decoration:underline">' +
-                'Clear</button>' +
             '</div>';
         }).join('');
       })
