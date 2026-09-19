@@ -1002,6 +1002,9 @@
               '<button type="button" class="add-item-btn" style="padding:8px 14px;font-size:13px" ' +
                 'onclick="artworkUploaded(this,' + i + ',\'' + escapeHtml_(o.invoiceNumber) + '\',' + (o.isWebsite ? 'true' : 'false') + ',' + (unpaid ? 'true' : 'false') + ')">' +
                 'Artwork uploaded &rarr; send to Tagify</button>' +
+              '<button type="button" onclick="clearCurrentOrder(this,' + i + ',\'' + escapeHtml_(o.invoiceNumber) + '\')" ' +
+                'style="font-size:12px;color:#888;background:none;border:none;padding:8px 0 0 14px;cursor:pointer;text-decoration:underline">' +
+                'Clear</button>' +
             '</div>';
         }).join('');
       })
@@ -1043,6 +1046,39 @@
         btn.disabled = false;
         btn.textContent = 'Try again';
         alert('Could not send: ' + err.message);
+      });
+  }
+
+  // Takes one order off this list without sending it anywhere — for orders
+  // that are finished, abandoned, or were never Tagify's to make. Same
+  // "mark complete" the pay run uses, so it also drops out of the Tagify
+  // lists. Reversible: set Shipped back to "No" on the sheet row.
+  function clearCurrentOrder(btn, i, invNum) {
+    if (!confirm('Clear #' + invNum + ' from Current Orders?\n\nIt will NOT be sent to Tagify.')) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Clearing…';
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'markOrdersComplete', password: getPassword(), invoices: [invNum], complete: true })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          btn.disabled = false;
+          btn.textContent = 'Clear';
+          alert(data.message || 'Could not clear that one.');
+          return;
+        }
+        var row = document.getElementById('curRow' + i);
+        if (row) row.innerHTML = '<div style="padding:12px 0;font-size:13px;color:#888">#' +
+          escapeHtml_(invNum) + ' cleared</div>';
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Clear';
+        alert('Could not clear that one: ' + err.message);
       });
   }
 
@@ -1148,7 +1184,9 @@
             escapeHtml_(o.company) + '</div>' +
           '<div style="font-size:11px;color:#999">#' + escapeHtml_(o.invoiceNumber) +
             (o.isWebsite ? ' · Website' : '') + (dateStr ? ' · ' + dateStr : '') +
-            (age !== null && age > 0 ? ' · ' + age + 'd' : '') + '</div>' +
+            (age !== null && age > 0 ? ' · ' + age + 'd' : '') +
+            // Counted in the bill, but Tagify hasn't been told about it yet.
+            (o.sent === false ? ' · <span style="color:#8a6100;font-weight:700">not sent yet</span>' : '') + '</div>' +
         '</div>' +
         (showCost ? '<div style="font-size:13px;font-weight:600;white-space:nowrap">£' + parseFloat(o.cost || 0).toFixed(2) + '</div>' : '') +
       '</div>';
