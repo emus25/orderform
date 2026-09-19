@@ -141,6 +141,8 @@
   .tagify-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 7px 16px; border-radius: 20px; margin-bottom: 18px; max-width: 300px; line-height: 1.4; }
   .tagify-badge.good { background: #f0faf5; color: #1a7a4c; }
   .tagify-badge.bad { background: #fdf1f1; color: #b3261e; }
+  /* Held = deliberately not sent yet. Never red, never offers Retry. */
+  .tagify-badge.hold { background: #fdf6e7; color: #8a6100; }
   .success .download-btn {
     width: 100%; max-width: 280px; background: #1a1a1a; color: #fff; border: none; border-radius: 10px;
     padding: 14px; font-family: 'Figtree', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
@@ -991,7 +993,7 @@
           var dateStr = '';
           try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
           var age = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
-          var unpaid = /unpaid/i.test(o.status || '');
+          var unpaid = (o.paid === false); // from the Payment Status column
           return '<div style="padding:12px 0;border-bottom:1px solid #f0f0ee" id="curRow' + i + '">' +
               // Clear sits up on the name row: down beside the send button it read
               // as a second step in sending, which is the opposite of what it does.
@@ -1544,15 +1546,49 @@
 
   /* ═══════════════ TAGIFY STATUS BADGE + RETRY ═══════════════ */
 
+  // Green = nothing left to do with Tagify. "Forwarded" is theirs; the others
+  // are what Ediz writes on the row when he has dealt with an order himself.
   function tagifyIsGood_(status) {
-    return /^Forwarded/.test(String(status || ''));
+    return /^(Forwarded|Completed|Fulfilled|Done)/i.test(String(status || ''));
   }
 
   // Populates a badge element with the Tagify status (green/red) and, on
   // failure, an inline "Retry now" link that re-runs the forward in place.
-  function showTagifyBadge(elId, status, invNum) {
+  function tagifyIsHold_(status) {
+    return /^Held/.test(String(status || ''));
+  }
+
+  // paymentStatus comes from the order row itself. The Tagify Status text is
+  // only a snapshot from when the order was taken, so an order paid later
+  // still reads "(unpaid)" in it forever — reading paid/unpaid from that text
+  // is what made a settled order like #10146 show as an unpaid failure.
+  function showTagifyBadge(elId, status, invNum, paymentStatus, shipped) {
     var el = document.getElementById(elId);
     if (!status) { el.style.display = 'none'; return; }
+
+    // An order marked complete on the sheet is done, whatever the Tagify text
+    // says — it's usually an old snapshot. Never red, never offers a Retry
+    // that would put a finished order back into production.
+    if (String(shipped || '').trim().toLowerCase() === 'yes') {
+      el.className = 'tagify-badge good';
+      el.textContent = tagifyIsGood_(status) ? 'NFC Tagify: ' + status : 'Completed';
+      el.style.display = 'inline-block';
+      return;
+    }
+
+    if (tagifyIsHold_(status)) {
+      // Unknown payment status = treat as paid; the sheet is the authority and
+      // every screen that knows it passes it in.
+      var unpaid = paymentStatus !== undefined &&
+        !/paid in full|partial deposit|on delivery/i.test(String(paymentStatus || ''));
+      el.className = 'tagify-badge hold';
+      el.textContent = unpaid
+        ? 'NFC Tagify: not sent — awaiting payment'
+        : 'NFC Tagify: not sent yet — waiting on artwork';
+      el.style.display = 'inline-block';
+      return;
+    }
+
     var good = tagifyIsGood_(status);
     el.className = 'tagify-badge ' + (good ? 'good' : 'bad');
     el.innerHTML = 'NFC Tagify: ' + escapeHtml_(status) +
@@ -1687,7 +1723,7 @@
         });
       }
       resultsEl.appendChild(row);
-      if (!o.isDraft) showTagifyBadge(badgeId, o.tagifyStatus, o.invoiceNumber);
+      if (!o.isDraft) showTagifyBadge(badgeId, o.tagifyStatus, o.invoiceNumber, o.paymentStatus, o.shipped);
     });
   }
 
@@ -1758,7 +1794,7 @@
         if (data.status !== 'success') { alert(data.message || 'Retry failed.'); return; }
         o.address = address;
         var badgeEl = row.querySelector('.tagify-badge');
-        if (badgeEl) showTagifyBadge(badgeEl.id, data.tagifyStatus, o.invoiceNumber);
+        if (badgeEl) showTagifyBadge(badgeEl.id, data.tagifyStatus, o.invoiceNumber, o.paymentStatus, o.shipped);
       })
       .catch(function () {
         btn.disabled = false;
