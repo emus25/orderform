@@ -430,6 +430,13 @@
         </div>
         <input type="text" id="coSource" placeholder="Add detail e.g. Esher chapter, expo name…" autocomplete="off">
       </div>
+      <!-- Custom work the catalogue has never seen — a software job, a one-off
+           service. Known non-Tagify products (Pro Plan, hosting) are spotted
+           automatically; this is for everything else. -->
+      <div class="co-field" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="coNoTagify" style="width:16px;height:16px;margin:0">
+        <label style="margin:0" for="coNoTagify">This order doesn't go to Tagify</label>
+      </div>
       <div class="co-field">
         <label>Notes</label>
         <textarea id="coNotes" placeholder="e.g. Gold engraving, QR code on back…"></textarea>
@@ -747,7 +754,7 @@
     // assumed to be entirely a Tagify cost. Used by the Tagify pay run so the
     // amount owed to them isn't inflated by costs that were never theirs.
     // Badges: £5.00 is Tagify's charge, the 40p is metal holders from Amazon.
-    "Digital Member Name Badges": { price: 10, cost: 5.40, ownCost: 0.40, variants: [] },
+    "BNI Digital Member Name Badges": { price: 10, cost: 5.40, ownCost: 0.40, variants: [] },
     "£1/year Hosting Fee": { price: 1, cost: 0, ownCost: 0, variants: [] },
     // Software/access product, not a physical card — no cost, no variant,
     // and deliberately no INPERSON_TAGIFY mapping in Code.gs, same pattern
@@ -757,7 +764,10 @@
     // price, this won't scale with it on its own. Tagify has no involvement,
     // so the whole cost is ours (ownCost === cost) and none of it is owed
     // to them, even though it's nearly always sold alongside a card.
-    "Exposure Boost Pro Plan Lifetime Access": { price: 99, cost: 19.80, ownCost: 19.80, variants: [] }
+    // Tagify's 20% on a Pro Plan is paid to him in cash with everything else,
+    // so none of this £19.80 is Ediz's own cost. It was set to 19.80, which
+    // made the pay run bill Tagify £0 for every Pro Plan sold.
+    "Exposure Boost Pro Plan Lifetime Access": { price: 99, cost: 19.80, ownCost: 0, variants: [] }
   };
 
   var CATALOG_NAMES = Object.keys(CATALOG_DATA);
@@ -1549,7 +1559,7 @@
   // Green = nothing left to do with Tagify. "Forwarded" is theirs; the others
   // are what Ediz writes on the row when he has dealt with an order himself.
   function tagifyIsGood_(status) {
-    return /^(Forwarded|Completed|Fulfilled|Done)/i.test(String(status || ''));
+    return /^(Forwarded|Completed|Fulfilled|Done|No Tagify)/i.test(String(status || ''));
   }
 
   // Populates a badge element with the Tagify status (green/red) and, on
@@ -2553,7 +2563,7 @@
 
     document.getElementById('itemsContainer').innerHTML = '';
     itemRowCount = 0;
-    addItemRow({ item: 'Digital Member Name Badges – ' + chapterName, qty: memberCount, price: 10 });
+    addItemRow({ item: 'BNI Digital Member Name Badges – ' + chapterName, qty: memberCount, price: 10 });
     addItemRow({ item: '£1/year Hosting Fee', qty: memberCount, price: 1 });
     calcTotal();
 
@@ -3041,7 +3051,8 @@
       discountLabel: discountLabel_(),
       depositAmount: depositAmountVal,
       orderKey:      currentOrderKey,
-      referredBy:    document.getElementById('fReferredBy').value
+      referredBy:    document.getElementById('fReferredBy').value,
+      noTagify:      document.getElementById('coNoTagify').checked
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
 
@@ -3100,6 +3111,7 @@
     document.getElementById('coAddress').value = '';
     document.getElementById('coSource').value = '';
     document.getElementById('coNotes').value = '';
+    document.getElementById('coNoTagify').checked = false;
     setReferredBy_('');
     document.getElementById('coDiscount').value = '';
     document.getElementById('coDiscUnitFlat').checked = true;
