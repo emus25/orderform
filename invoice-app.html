@@ -384,10 +384,6 @@
         <div class="co-pay-row">
           <input class="co-pay-radio" type="radio" name="coPay" id="coPm1" value="Monzo transfer" onchange="calcTotal()">
           <label class="co-pay-pill" for="coPm1">Monzo</label>
-          <input class="co-pay-radio" type="radio" name="coPay" id="coPm2" value="Lopay card" onchange="calcTotal()">
-          <label class="co-pay-pill" for="coPm2">Lopay Card</label>
-          <input class="co-pay-radio" type="radio" name="coPay" id="coPm5" value="Lopay Link" onchange="calcTotal()">
-          <label class="co-pay-pill" for="coPm5">Lopay Link</label>
           <input class="co-pay-radio" type="radio" name="coPay" id="coPm3" value="Cash" onchange="calcTotal()">
           <label class="co-pay-pill" for="coPm3">Cash</label>
           <input class="co-pay-radio" type="radio" name="coPay" id="coPm4" value="Stripe" onchange="calcTotal()">
@@ -433,9 +429,13 @@
       <!-- Custom work the catalogue has never seen — a software job, a one-off
            service. Known non-Tagify products (Pro Plan, hosting) are spotted
            automatically; this is for everything else. -->
-      <div class="co-field" style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="coNoTagify" style="width:16px;height:16px;margin:0">
-        <label style="margin:0" for="coNoTagify">This order doesn't go to Tagify</label>
+      <div class="co-field" style="display:flex;align-items:flex-start;gap:10px">
+        <input type="checkbox" id="coNoTagify" style="width:18px;height:18px;margin:2px 0 0;flex:0 0 auto">
+        <label style="margin:0" for="coNoTagify">Nothing for Tagify to make
+          <span style="display:block;font-weight:400;color:#999;font-size:12px;line-height:1.5">
+            Tick only for work he doesn't produce — software, a logo redraw, consultancy.
+            Leave unticked and the order goes to him when you press Artwork uploaded.</span>
+        </label>
       </div>
       <div class="co-field">
         <label>Notes</label>
@@ -668,6 +668,7 @@
     // concurrent-request flakiness described above; it retries once anyway.
     setTimeout(loadPartners, 1200);
     setTimeout(syncCatalogToServer, 2400);
+    setTimeout(loadProductsFromSheet, 900);   // the sheet's price list wins
   }
 
   function submitLockScreen() {
@@ -975,6 +976,9 @@
   // Orders are held back from Tagify from the moment they're created (website
   // and in person alike) — he only wants an order once its artwork is ready to
   // produce. This is the list of what's held, and one button per order sends it.
+  // The exact rows on screen, so a button knows its order's phone and tracking.
+  var currentOrdersShown = [];
+
   function loadCurrentOrders() {
     var btn = document.getElementById('currentRefreshBtn');
     var list = document.getElementById('currentList');
@@ -994,6 +998,7 @@
         }
 
         var orders = data.orders || [];
+        currentOrdersShown = orders;
         if (!orders.length) {
           list.innerHTML = '<div style="font-size:14px;color:#1a7a4c;font-weight:600;padding:8px 0">Nothing waiting — every order is with Tagify.</div>';
           return;
@@ -1019,9 +1024,14 @@
                 (age !== null && age > 0 ? ' · ' + age + 'd' : '') +
                 (unpaid ? ' · <span style="color:#b3261e;font-weight:700">UNPAID</span>' : '') + '</div>' +
               '<div style="font-size:12px;color:#666;margin-bottom:8px;line-height:1.5">' + escapeHtml_(o.items || '') + '</div>' +
-              '<button type="button" class="add-item-btn" style="padding:8px 14px;font-size:13px" ' +
-                'onclick="artworkUploaded(this,' + i + ',\'' + escapeHtml_(o.invoiceNumber) + '\',' + (o.isWebsite ? 'true' : 'false') + ',' + (unpaid ? 'true' : 'false') + ')">' +
-                'Artwork uploaded &rarr; send to Tagify</button>' +
+              (o.stage === 'tracking'
+                ? '<div style="font-size:12px;color:#1a7a4c;margin-bottom:8px">Shipped' +
+                  (o.carrier ? ' with ' + escapeHtml_(o.carrier) : '') + ' · ' + escapeHtml_(o.trackingNumber) + '</div>'
+                : '') +
+              (o.stage === 'delivered'
+                ? '<div style="font-size:12px;color:#8a6100;margin-bottom:8px">Customer has the tracking — has it arrived?</div>'
+                : '') +
+              nextActionButton_(o, i, unpaid) +
             '</div>';
         }).join('');
       })
@@ -1029,6 +1039,73 @@
         btn.disabled = false;
         btn.textContent = 'Refresh';
         list.innerHTML = '<div style="font-size:13px;color:#e53e3e">Could not load — please try again.</div>';
+      });
+  }
+
+  // One button per row, and it's whatever that order needs next.
+  function nextActionButton_(o, i, unpaid) {
+    var inv = escapeHtml_(o.invoiceNumber);
+    var btn = 'class="add-item-btn" style="padding:8px 14px;font-size:13px"';
+
+    if (o.stage === 'tracking') {
+      return '<button type="button" ' + btn + ' onclick="sendTracking(this,' + i + ',\'' + inv + '\')">' +
+        'Send tracking to customer</button>';
+    }
+    if (o.stage === 'delivered') {
+      return '<button type="button" ' + btn + ' onclick="stampOrder(this,' + i + ',\'' + inv + '\',\'Delivered\')">' +
+        'Mark delivered</button>';
+    }
+    return '<button type="button" ' + btn + ' onclick="artworkUploaded(this,' + i + ',\'' + inv + '\',' +
+      (o.isWebsite ? 'true' : 'false') + ',' + (unpaid ? 'true' : 'false') + ')">' +
+      'Artwork uploaded &rarr; send to Tagify</button>';
+  }
+
+  // Opens WhatsApp with the message already written, then records that they've
+  // been told. You still press send — WhatsApp won't let anything else.
+  function sendTracking(btn, i, invNum) {
+    var o = currentOrdersShown[i];
+    if (!o) return;
+
+    var courier = o.carrier && !/not given/i.test(o.carrier) ? o.carrier : 'the courier';
+    var msg = 'Hi' + (o.company ? ' ' + o.company : '') + ', your ExposureBoost order has been dispatched with ' +
+      courier + '. Tracking: ' + o.trackingNumber + (o.trackingUrl ? '\n' + o.trackingUrl : '') +
+      '\n\nAny problems, just reply here.';
+
+    var digits = String(o.phone || '').replace(/[^0-9]/g, '');
+    if (digits.indexOf('0') === 0) digits = '44' + digits.slice(1);   // UK mobile -> international
+    var url = digits
+      ? 'https://wa.me/' + digits + '?text=' + encodeURIComponent(msg)
+      : 'https://wa.me/?text=' + encodeURIComponent(msg);            // no number on file: pick the chat yourself
+    window.open(url, '_blank');
+
+    stampOrder(btn, i, invNum, 'Tracking Sent');
+  }
+
+  // Writes today's date into one column on the order row.
+  function stampOrder(btn, i, invNum, column) {
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'stampOrderDate', password: getPassword(), invoiceNumber: invNum, column: column })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          btn.disabled = false;
+          btn.textContent = 'Try again';
+          alert(data.message || 'Could not save that.');
+          return;
+        }
+        var row = document.getElementById('curRow' + i);
+        if (row) row.innerHTML = '<div style="padding:12px 0;font-size:13px;color:#1a7a4c;font-weight:600">#' +
+          escapeHtml_(invNum) + (column === 'Delivered' ? ' delivered ✓' : ' — customer told ✓') + '</div>';
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Try again';
+        alert('Could not save that: ' + err.message);
       });
   }
 
@@ -1102,6 +1179,46 @@
   function syncCatalogToServer() {
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'syncCatalog', password: getPassword(), catalog: CATALOG_DATA }) })
       .catch(function () {});
+  }
+
+  // The price list belongs in the Products tab of the sheet, where Ediz can see
+  // and change it. This pulls it in on unlock and replaces the built-in copy.
+  //
+  // Two deliberate safeties: the built-in list stays as the fallback, and a tab
+  // with fewer than five products is treated as half-set-up rather than as the
+  // truth — otherwise one bad edit could empty the order form mid-sale.
+  function loadProductsFromSheet() {
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getProducts', password: getPassword() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status !== 'success') return;
+
+        if (!data.count || data.count < 5) {
+          // Nothing usable there yet — offer to fill it from what's built in.
+          seedProductsIfEmpty_(data.count || 0);
+          return;
+        }
+        CATALOG_DATA = data.products;
+        CATALOG_NAMES = Object.keys(CATALOG_DATA);
+        refreshCatalogList_();
+      })
+      .catch(function () {});   // offline or slow: the built-in list still works
+  }
+
+  function seedProductsIfEmpty_(existing) {
+    if (existing > 0) return;   // partly filled in — leave it alone, it's his
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'seedProducts', password: getPassword(), catalog: CATALOG_DATA })
+    }).catch(function () {});
+  }
+
+  function refreshCatalogList_() {
+    var list = document.getElementById('catalogDatalist');
+    if (!list) return;
+    list.innerHTML = CATALOG_NAMES.map(function (n) {
+      return '<option value="' + n.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">';
+    }).join('');
   }
 
   function setPartnerPassword(i) {
@@ -1514,7 +1631,7 @@
 
     document.getElementById('payLinkCard').style.display = (m === 'draft') ? 'block' : 'none';
     // Draft's plain "Total" preview and Paid's richer "Order total" (with
-    // the Lopay fee line) are two different displays of the same figure —
+    // the fee line) are two different displays of the same figure —
     // only one should ever be visible, or they can show conflicting stale
     // numbers when calcTotal() only updates whichever one is active.
     document.getElementById('totalPreviewCard').style.display = (m === 'draft') ? 'flex' : 'none';
@@ -1944,6 +2061,7 @@
     row.className = 'item-row';
     row.dataset.rowId = id;
     row.dataset.cost = '';
+    row.dataset.ownCost = '';
     row.innerHTML =
       '<div class="item-row-head"><span>Item</span>' +
         '<button type="button" class="remove-item-btn" onclick="removeItemRow(' + id + ')">&times;</button></div>' +
@@ -2110,6 +2228,8 @@
     if (!data) {
       wrap.style.display = 'none';
       row.dataset.cost = '';
+    row.dataset.ownCost = '';
+      row.dataset.ownCost = '';
       row.classList.remove('row-error');
       noteEl.style.display = raw ? 'block' : 'none';
       return;
@@ -2117,6 +2237,7 @@
     noteEl.style.display = 'none';
 
     row.dataset.cost = data.cost;
+    row.dataset.ownCost = data.ownCost || 0;   // the 40p-a-badge part, never owed to Tagify
     if (!qtyEl.value) qtyEl.value = 1;
     if (!priceEl.value) priceEl.value = data.price.toFixed(2);
 
@@ -2177,6 +2298,8 @@
     if (container.children.length <= 1) {
       row.classList.remove('row-error', 'row-shake');
       row.dataset.cost = '';
+    row.dataset.ownCost = '';
+      row.dataset.ownCost = '';
       row.querySelector('.fItem').value = '';
       row.querySelector('.fQty').value = '';
       row.querySelector('.fPrice').value = '';
@@ -2264,7 +2387,8 @@
         name:  name,
         qty:   parseFloat(row.querySelector('.fQty').value) || 0,
         price: parseFloat(row.querySelector('.fPrice').value) || 0,
-        cost:  parseFloat(row.dataset.cost) || 0
+        cost:  parseFloat(row.dataset.cost) || 0,
+        ownCost: parseFloat(row.dataset.ownCost) || 0
       };
     });
   }
@@ -2312,20 +2436,14 @@
       var discount = computeDiscountAmount_(grossTotal);
       var total = grossTotal - discount;
 
-      // Lopay Link carries an extra 0.49% on top of the standard card rate —
-      // same fixed £0.08, just a higher percentage since it's a payment link
-      // rather than a card-present transaction.
-      var pay = document.querySelector('input[name="coPay"]:checked');
-      var isLopayCard = pay && pay.value === 'Lopay card';
-      var isLopayLink = pay && pay.value === 'Lopay Link';
-      var lopayRate = isLopayLink ? 0.0148 : (isLopayCard ? 0.0099 : 0);
-      var fee = (isLopayCard || isLopayLink) ? total * lopayRate + 0.08 : 0;
-      var net = total - fee;
+      // Cash and bank transfer cost nothing to take, so an in-person order has
+      // no fee. Website orders carry Stripe's, which the Worker records.
+      var fee = 0;
+      var net = total;
       document.getElementById('coTotalVal').textContent = '£' + total.toFixed(2);
       var feeLine = document.getElementById('coFeeLine');
       var feeLineText = '';
       if (discount > 0) feeLineText += 'Discount −£' + discount.toFixed(2) + ' applied. ';
-      if ((isLopayCard || isLopayLink) && fee > 0) feeLineText += 'Lopay fee −£' + fee.toFixed(2) + ' → you keep £' + net.toFixed(2);
       if (feeLineText) {
         feeLine.textContent = feeLineText;
         feeLine.style.display = 'block';
@@ -2867,7 +2985,7 @@
       var depTxt = isNaN(dep) ? '0.00' : dep.toFixed(2);
       label.textContent = 'Invoice will show: PAYMENT PENDING — £' + depTxt + ' deposit taken, balance due shown on the invoice.';
     } else {
-      label.textContent = 'Invoice will show: PAYMENT PENDING — full amount due on delivery. Still forwarded to Tagify for production now.';
+      label.textContent = 'Invoice will show: PAYMENT PENDING — full amount due on delivery.';
     }
   }
 
