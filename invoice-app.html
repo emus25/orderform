@@ -1015,6 +1015,11 @@
               '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
                 '<div style="font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
                   escapeHtml_(o.company) + '</div>' +
+                (o.stage === 'artwork'
+                  ? '<button type="button" onclick="editCurrentOrder(' + i + ')" ' +
+                    'style="font-size:12px;color:#1d4ed8;background:none;border:none;padding:0 12px 0 0;cursor:pointer;text-decoration:underline;white-space:nowrap">' +
+                    'Edit</button>'
+                  : '') +
                 '<button type="button" onclick="clearCurrentOrder(this,' + i + ',\'' + escapeHtml_(o.invoiceNumber) + '\')" ' +
                   'style="font-size:12px;color:#999;background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;white-space:nowrap">' +
                   'Clear</button>' +
@@ -1040,6 +1045,52 @@
         btn.textContent = 'Refresh';
         list.innerHTML = '<div style="font-size:13px;color:#e53e3e">Could not load — please try again.</div>';
       });
+  }
+
+  // The order being edited, or null. Set by Edit on a Current row; cleared
+  // when the edit is submitted or cancelled.
+  var editingOrderNumber = null;
+
+  // Loads a live order back into the Paid form so the items can be changed —
+  // for when a customer changes their mind before it reaches Tagify. It's the
+  // same order throughout: same number, same invoice, same date.
+  function editCurrentOrder(i) {
+    var o = currentOrdersShown[i];
+    if (!o) return;
+
+    editingOrderNumber = o.invoiceNumber;
+    convertingDraftRef = null;
+    currentOrderKey = null;
+    setMode('paid');
+
+    document.getElementById('fCompany').value = o.company === '(no name)' ? '' : o.company;
+    document.getElementById('coPhone').value = o.phone || '';
+
+    // Items back out of the stored text: "Name x2 @ £45.00 | Other x1 @ £30.00"
+    document.getElementById('itemsContainer').innerHTML = '';
+    itemRowCount = 0;
+    String(o.items || '').split('|').forEach(function (piece) {
+      var m = piece.trim().match(/^(.*)\sx([\d.]+)\s@\s£([\d.]+)$/);
+      if (m) addItemRow({ item: m[1].trim(), qty: parseFloat(m[2]) || 1, price: parseFloat(m[3]) || 0 });
+    });
+    if (!getItemRows().length) addItemRow();
+    calcTotal();
+
+    var banner = document.getElementById('convertBanner');
+    banner.style.display = 'flex';
+    document.getElementById('convertBannerText').textContent =
+      'Editing order #' + o.invoiceNumber + ' (' + o.company + ') — change the items, then Save changes. ' +
+      'Same order number, same invoice.';
+
+    document.getElementById('generateBtn').textContent = 'Save changes to #' + o.invoiceNumber;
+    setTab('invoice');
+    document.getElementById('invoiceScreen').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function cancelEditOrder() {
+    editingOrderNumber = null;
+    document.getElementById('convertBanner').style.display = 'none';
+    document.getElementById('generateBtn').textContent = 'Submit order & send invoice →';
   }
 
   // One button per row, and it's whatever that order needs next.
@@ -2659,6 +2710,7 @@
 
   function cancelConvertDraft() {
     convertingDraftRef = null;
+    if (editingOrderNumber) { cancelEditOrder(); return; }
     document.getElementById('convertBanner').style.display = 'none';
   }
 
@@ -3101,6 +3153,40 @@
       });
   }
 
+  // Saves an edit to an existing order. Deliberately plain — no invoice
+  // regenerated, no Tagify call: the order hasn't been sent yet, and the
+  // customer's invoice number hasn't changed.
+  function submitOrderEdit_(payload, basket) {
+    var btn = document.getElementById('generateBtn');
+    var invNum = payload.invoiceNumber;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') {
+          btn.textContent = 'Save changes to #' + invNum;
+          showError(data.message || 'Could not save those changes.');
+          return;
+        }
+        cancelEditOrder();
+        resetCoForm();
+        alert('#' + invNum + ' updated: ' + basket.map(function (i) { return i.name + ' x' + i.qty; }).join(', ') +
+              '\n\nTotal £' + Number(data.revenue || 0).toFixed(2) +
+              '\n\nThe customer still has the original invoice — resend it if the price changed.');
+        setTab('current');
+        loadCurrentOrders();
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Save changes to #' + invNum;
+        showError('Could not save those changes: ' + err.message);
+      });
+  }
+
   function handlePaidSubmit() {
     document.getElementById('errorMsg').classList.remove('show');
 
@@ -3173,6 +3259,14 @@
       noTagify:      document.getElementById('coNoTagify').checked
     };
     if (convertingDraftRef) payload.draftRef = convertingDraftRef;
+
+    // Editing a live order: rewrite that row rather than create a second one.
+    if (editingOrderNumber) {
+      payload.action = 'updateOrder';
+      payload.invoiceNumber = editingOrderNumber;
+      submitOrderEdit_(payload, basket);
+      return;
+    }
 
     var total = Math.max(0, grossTotal - payload.discount);
     var summary = basket.map(function (i) { return i.name + ' x' + i.qty; }).join('\n');
