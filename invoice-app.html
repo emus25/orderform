@@ -591,6 +591,12 @@
 
   <!-- ══════════ SYSTEM CHECK — outside the tabs, always available ══════════ -->
   <div style="margin-top:32px;padding-top:20px;border-top:1px solid #ececea">
+    <button type="button" class="add-item-btn" id="shippingSyncBtn" onclick="pullShippingFromTagify()">Pull shipping from Tagify</button>
+    <div style="font-size:12px;color:#999;margin:8px 0 18px;line-height:1.5">
+      Asks Tagify for every order he's shipped and files the tracking numbers. Anything new shows up in Current with a
+      <b>Send tracking</b> button.
+    </div>
+
     <button type="button" class="add-item-btn" id="tagifyCheckBtn" onclick="runTagifyCheck()">Check Tagify product codes</button>
     <div style="font-size:12px;color:#999;margin-top:8px;line-height:1.5">
       Compares every product you sell — in person and on the website — against Tagify's live catalog, and lists anything that wouldn't reach them.
@@ -1476,6 +1482,35 @@
       });
   }
 
+  // Pulls every shipped order from Tagify and files the tracking. Safe to press
+  // as often as you like — an order already logged is skipped, so it can never
+  // double-record. The twice-daily check does the same thing on its own.
+  function pullShippingFromTagify() {
+    var btn = document.getElementById('shippingSyncBtn');
+    btn.disabled = true;
+    btn.textContent = 'Asking Tagify…';
+
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'syncShippingDetails', password: getPassword() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = 'Pull shipping from Tagify';
+        if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
+        if (data.status !== 'success') { alert(data.message || 'Could not reach Tagify.'); return; }
+
+        alert(data.added
+          ? data.added + ' new tracking number' + (data.added === 1 ? '' : 's') + ' filed (checked ' + data.checked + ' Tagify orders).\n\nThey are in Current now, ready to send to the customer.'
+          : 'Nothing new — checked ' + data.checked + ' Tagify orders and they are all already logged.');
+
+        if (data.added) { setTab('current'); loadCurrentOrders(); }
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Pull shipping from Tagify';
+        alert('Could not reach Tagify: ' + err.message);
+      });
+  }
+
   /* ═══════════════ TAGIFY MAPPING CHECK ═══════════════ */
 
   // Sends this page's own CATALOG_DATA along, so the backend can check every
@@ -1727,7 +1762,10 @@
   // Green = nothing left to do with Tagify. "Forwarded" is theirs; the others
   // are what Ediz writes on the row when he has dealt with an order himself.
   function tagifyIsGood_(status) {
-    return /^(Forwarded|Completed|Fulfilled|Done|No Tagify)/i.test(String(status || ''));
+    // "No Tagify items" is deliberately NOT in here. It means nothing was sent,
+    // which is only correct if that was the intention — showing it in calm green
+    // is how two orders sat unsent without anyone noticing.
+    return /^(Forwarded|Completed|Fulfilled|Done)/i.test(String(status || ''));
   }
 
   // Populates a badge element with the Tagify status (green/red) and, on
@@ -1750,6 +1788,16 @@
     if (String(shipped || '').trim().toLowerCase() === 'yes') {
       el.className = 'tagify-badge good';
       el.textContent = tagifyIsGood_(status) ? 'NFC Tagify: ' + status : 'Completed';
+      el.style.display = 'inline-block';
+      return;
+    }
+
+    // Nothing was sent because the tick was on. Amber, and it says why.
+    if (/^No Tagify/i.test(String(status))) {
+      el.className = 'tagify-badge hold';
+      el.innerHTML = 'NOT sent to Tagify — you ticked \u201cnothing for Tagify to make\u201d' +
+        (invNum ? '<br><a href="#" onclick="retryTagifyInline(\'' + elId + '\',\'' + invNum + '\');return false;" ' +
+          'style="color:#8a6100;text-decoration:underline;font-weight:700">Send it now</a>' : '');
       el.style.display = 'inline-block';
       return;
     }
