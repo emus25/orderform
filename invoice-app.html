@@ -1010,7 +1010,11 @@
           return;
         }
 
-        list.innerHTML = orders.map(function (o, i) {
+
+        // Current is for what needs designing. Everything already shipped —
+        // tracking to send, deliveries to confirm — folds behind one line, so a
+        // backlog of 15 posted orders can't bury the two that need artwork.
+        var rowHtml = orders.map(function (o, i) {
           var dateStr = '';
           try { dateStr = new Date(o.date).toLocaleDateString('en-GB'); } catch (e) {}
           var age = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
@@ -1044,7 +1048,25 @@
                 : '') +
               nextActionButton_(o, i, unpaid) +
             '</div>';
-        }).join('');
+        });
+
+        var artwork = [], posted = [];
+        orders.forEach(function (o, i) {
+          (o.stage === 'artwork' ? artwork : posted).push(rowHtml[i]);
+        });
+
+        list.innerHTML =
+          (artwork.length
+            ? artwork.join('')
+            : '<div style="font-size:14px;color:#1a7a4c;font-weight:600;padding:8px 0">Nothing waiting on artwork.</div>') +
+          (posted.length
+            ? '<div style="margin-top:18px;padding-top:14px;border-top:1px solid #f0f0ee">' +
+                '<button type="button" onclick="toggleShippedOrders_(this)" ' +
+                  'style="font-size:13px;color:#888;background:none;border:none;padding:0;cursor:pointer;text-decoration:underline">' +
+                  posted.length + ' shipped — customer not told yet</button>' +
+                '<div id="shippedOrders" style="display:none;margin-top:10px">' + posted.join('') + '</div>' +
+              '</div>'
+            : '');
       })
       .catch(function () {
         btn.disabled = false;
@@ -1198,6 +1220,16 @@
         btn.textContent = 'Try again';
         alert('Could not send: ' + err.message);
       });
+  }
+
+  function toggleShippedOrders_(btn) {
+    var box = document.getElementById('shippedOrders');
+    if (!box) return;
+    var showing = box.style.display !== 'none';
+    box.style.display = showing ? 'none' : 'block';
+    btn.textContent = showing
+      ? btn.textContent.replace('hide — ', '')
+      : 'hide — ' + btn.textContent;
   }
 
   // Takes one order off this list without sending it anywhere — for orders
