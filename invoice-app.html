@@ -1025,7 +1025,9 @@
               '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
                 '<div style="font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
                   escapeHtml_(o.company) + '</div>' +
-                (o.stage === 'artwork'
+                // Not on website orders: they were paid through Stripe at website
+                // prices, and the Paid form would re-price them as in-person sales.
+                (o.stage === 'artwork' && !o.isWebsite
                   ? '<button type="button" onclick="editCurrentOrder(' + i + ')" ' +
                     'style="font-size:12px;color:#1d4ed8;background:none;border:none;padding:0 12px 0 0;cursor:pointer;text-decoration:underline;white-space:nowrap">' +
                     'Edit</button>'
@@ -3312,6 +3314,23 @@
       payStatus = 'Paid in full';
     }
 
+    // The "nothing for Tagify to make" tick is easy to leave on by accident, and
+    // the price of that is an order that silently never reaches him — it has
+    // already happened twice (#10209, #10210). If it's ticked while the order
+    // plainly contains things he makes, say so before submitting.
+    if (document.getElementById('coNoTagify').checked) {
+      var madeByTagify = basket.filter(function (i) {
+        return CATALOG_LOOKUP[splitCatalogSuffix_(i.name).baseName.toLowerCase()];
+      });
+      if (madeByTagify.length && !confirm(
+          'You\'ve ticked "Nothing for Tagify to make", but this order has ' +
+          madeByTagify.map(function (i) { return i.name; }).join(' and ') +
+          ' on it.\n\nSubmit anyway? It will NOT be sent to Tagify.')) {
+        document.getElementById('coNoTagify').checked = false;
+        return;
+      }
+    }
+
     // Generate the key on the first attempt; a retry after a failed/timed-out
     // send reuses the same one, so the server can tell it's the same order.
     if (!currentOrderKey) currentOrderKey = newOrderKey_();
@@ -3358,6 +3377,7 @@
         if (data.status === 'forbidden') { lockApp('Session expired — please re-enter the password.'); return; }
         if (data.status !== 'success') throw new Error(data.message || 'failed');
 
+        document.getElementById('coNoTagify').checked = false;   // never carries into the next order
         var confirmedInv = data.invoiceNumber || invoiceNumAtSubmit;
         var discountLine = payload.discount > 0 ? ('\nDiscount applied: -£' + payload.discount.toFixed(2)) : '';
 

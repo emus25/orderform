@@ -210,7 +210,7 @@
 
 <script>
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcMfHCK9FHp8RZXnJBDOQ-5vLheJT4g0vo7hC5-7wGyHYnbY2TpmXnC1qjLtBmTW92pA/exec';
-  var MILEAGE_RATE = 0.45;
+  var MILEAGE_RATE = 0.55; // HMRC approved mileage rate, updated April 2026
   var isPetrol = false;
 
   // The password itself is never stored in this file — it's typed by the
@@ -342,7 +342,7 @@
     var calc   = document.getElementById('milesCalc');
     var symbol = document.getElementById('symbol');
     if (miles > 0) {
-      calc.textContent = '= £' + amount.toFixed(2) + ' at 45p/mile';
+      calc.textContent = '= £' + amount.toFixed(2) + ' at ' + (MILEAGE_RATE * 100) + 'p/mile';
       symbol.classList.add('active');
     } else {
       calc.textContent = '';
